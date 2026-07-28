@@ -11,7 +11,8 @@ from flask import Flask, request, jsonify, send_from_directory
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
+# 数据目录 - 可通过环境变量 DATA_DIR 自定义（推荐绑定 Railway Volume 实现持久化）
+DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(BASE_DIR, 'data')
 DATA_FILE = os.path.join(DATA_DIR, 'data.json')
 os.makedirs(DATA_DIR, exist_ok=True)
 

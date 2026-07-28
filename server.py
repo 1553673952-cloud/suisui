@@ -121,6 +121,27 @@ def delete_diary(did):
 
 # ===== 智能体 API =====
 
+# 智谱AI免费模型列表
+FREE_MODELS = {
+    'chat': [  # 可用于智能体对话
+        {'id': 'GLM-4.7-Flash', 'name': 'GLM-4.7-Flash', 'desc': '最新版免费对话模型'},
+        {'id': 'GLM-4-Flash-250414', 'name': 'GLM-4-Flash-250414', 'desc': 'GLM-4-Flash 2025-04-14版'},
+        {'id': 'GLM-4.6V-Flash', 'name': 'GLM-4.6V-Flash', 'desc': '免费多模态（可看图片）'},
+        {'id': 'GLM-4.1V-Thinking-Flash', 'name': 'GLM-4.1V-Thinking-Flash', 'desc': '免费多模态+深度思考'},
+        {'id': 'GLM-4V-Flash', 'name': 'GLM-4V-Flash', 'desc': '免费视觉模型'},
+    ],
+    'image': [  # 文生图
+        {'id': 'Cogview-3-Flash', 'name': 'Cogview-3-Flash', 'desc': '免费AI画图'},
+    ],
+    'video': [  # 文生视频
+        {'id': 'CogVideoX-Flash', 'name': 'CogVideoX-Flash', 'desc': '免费AI视频生成'},
+    ]
+}
+
+@app.route('/api/models', methods=['GET'])
+def get_models():
+    return jsonify(FREE_MODELS)
+
 @app.route('/api/agents', methods=['GET'])
 def get_agents():
     d = load()
@@ -194,7 +215,7 @@ def chat_with_agent(aid):
         # 优先使用智能体自己的配置，没有则用环境变量或默认值
         api_key = agent.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
         base_url = agent.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
-        model = agent.get('model') or os.environ.get('AI_MODEL', 'glm-4-flash')
+        model = agent.get('model') or os.environ.get('AI_MODEL', 'GLM-4.7-Flash')
         
         resp = requests.post(
             f'{base_url}/chat/completions',

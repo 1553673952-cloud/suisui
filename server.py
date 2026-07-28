@@ -183,12 +183,9 @@ def chat_with_agent(aid):
         messages.append({'role': msg.get('role', 'user'), 'content': msg.get('content', '')})
     
     try:
-        import requests
-        api_key = os.environ.get('AI_API_KEY', '')
-        base_url = os.environ.get('AI_API_BASE_URL', 'https://api.openai.com/v1')
-        model = os.environ.get('AI_MODEL', 'gpt-4o-mini')
-        if not api_key:
-            return jsonify({'error': 'AI_API_KEY 未配置，请在环境变量中设置'}), 400
+        api_key = os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
+        base_url = os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
+        model = os.environ.get('AI_MODEL', 'glm-4-flash')
         
         resp = requests.post(
             f'{base_url}/chat/completions',

@@ -4,13 +4,16 @@
 碎碎念 · 云服务器版
 带日记 & 智能体功能（每个智能体可独立配置API）
 """
-import os, json
+import os, json, uuid
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
+AVATAR_DIR = os.path.join(UPLOAD_DIR, 'avatars')
+os.makedirs(AVATAR_DIR, exist_ok=True)
 # 数据目录 - 可通过环境变量 DATA_DIR 自定义（推荐绑定 Railway Volume 实现持久化）
 DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(BASE_DIR, 'data')
 DATA_FILE = os.path.join(DATA_DIR, 'data.json')
@@ -141,6 +144,28 @@ FREE_MODELS = {
 @app.route('/api/models', methods=['GET'])
 def get_models():
     return jsonify(FREE_MODELS)
+
+# ===== 文件上传 API =====
+
+@app.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    return send_from_directory(UPLOAD_DIR, filename)
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'error': '没有上传文件'}), 400
+    f = request.files['file']
+    if f.filename == '':
+        return jsonify({'error': '文件名为空'}), 400
+    # 只允许图片
+    if not f.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+        return jsonify({'error': '仅支持 PNG/JPG/GIF/WEBP 格式'}), 400
+    ext = os.path.splitext(f.filename)[1]
+    filename = f'avatar_{uuid.uuid4().hex}{ext}'
+    f.save(os.path.join(AVATAR_DIR, filename))
+    url = f'/uploads/avatars/{filename}'
+    return jsonify({'url': url, 'filename': filename})
 
 @app.route('/api/agents', methods=['GET'])
 def get_agents():

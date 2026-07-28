@@ -427,7 +427,7 @@ async function loadAgents(){
     var c=document.getElementById('agentsContainer');
     if(!list.length){c.innerHTML='<div class="empty-state"><div class="big">🤖</div>还没有智能体～<br>点击下方添加吧</div>';return;}
     c.innerHTML='<div class="agent-grid">'+list.map(function(a){
-      return '<div class="agent-card" onclick="openChat('+a.id+',''+(a.name||'').replace(/'/g,"\'")+'',''+(a.color||'#7C4DFF')+'')">'+
+      return `<div class="agent-card" onclick="openChat(${a.id},'${(a.name||'').replace(/'/g,"\\'")}','${a.color||"#7C4DFF"}')">`+
         '<div class="agent-avatar" style="background:'+(a.color||'#7C4DFF')+'">'+(a.avatar||'🤖')+'</div>'+
         '<div class="agent-name" style="color:'+(a.color||'#7C4DFF')+'">'+(a.name||'')+'</div>'+
         '<div class="agent-prompt">'+((a.prompt||'').substring(0,20)+(a.prompt&&a.prompt.length>20?'…':''))+'</div></div>';

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 碎碎念 · 云服务器版
-带日记 & 智能体功能
+带日记 & 智能体功能（每个智能体可独立配置API）
 """
 import os, json
 from datetime import datetime
@@ -29,7 +29,7 @@ def save(d):
 def index():
     return send_from_directory(BASE_DIR, 'index.html')
 
-# ===== 旧：碎碎念 API =====
+# ===== 碎碎念 API =====
 
 @app.route('/api/posts', methods=['GET'])
 def get_posts():
@@ -82,7 +82,7 @@ def delete_post(pid):
     save(d)
     return jsonify({'ok': True})
 
-# ===== 新：日记 API =====
+# ===== 日记 API =====
 
 @app.route('/api/diaries', methods=['GET'])
 def get_diaries():
@@ -118,7 +118,7 @@ def delete_diary(did):
     save(d)
     return jsonify({'ok': True})
 
-# ===== 新：智能体 API =====
+# ===== 智能体 API =====
 
 @app.route('/api/agents', methods=['GET'])
 def get_agents():
@@ -138,6 +138,9 @@ def add_agent():
         'avatar': body.get('avatar', '🤖'),
         'color': body.get('color', '#7C4DFF'),
         'prompt': body.get('prompt', '你是一个温柔可爱的助手。'),
+        'api_key': body.get('api_key', ''),
+        'api_base_url': body.get('api_base_url', ''),
+        'model': body.get('model', ''),
         'created': datetime.now().strftime('%Y-%m-%d')
     }
     d['agents'].append(agent)
@@ -155,6 +158,9 @@ def update_agent(aid):
             if 'avatar' in body: agent['avatar'] = body['avatar']
             if 'color' in body: agent['color'] = body['color']
             if 'prompt' in body: agent['prompt'] = body['prompt']
+            if 'api_key' in body: agent['api_key'] = body['api_key']
+            if 'api_base_url' in body: agent['api_base_url'] = body['api_base_url']
+            if 'model' in body: agent['model'] = body['model']
             save(d)
             return jsonify(agent)
     return 'Not found', 404
@@ -183,9 +189,11 @@ def chat_with_agent(aid):
         messages.append({'role': msg.get('role', 'user'), 'content': msg.get('content', '')})
     
     try:
-        api_key = os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
-        base_url = os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
-        model = os.environ.get('AI_MODEL', 'glm-4-flash')
+        import requests
+        # 优先使用智能体自己的配置，没有则用环境变量或默认值
+        api_key = agent.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
+        base_url = agent.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
+        model = agent.get('model') or os.environ.get('AI_MODEL', 'glm-4-flash')
         
         resp = requests.post(
             f'{base_url}/chat/completions',

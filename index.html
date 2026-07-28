@@ -115,17 +115,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 </head>
 <body>
 
-<div class="overlay" id="setupOverlay">
+<!-- 登录/注册弹窗 -->
+<div class="overlay" id="authOverlay">
   <div class="setup-card">
     <h2>✧ 欢迎来到碎碎念</h2>
-    <p class="sub">给自己取个名字，选个可爱的头像吧</p>
+    <p class="sub">登录或注册，开启你的小窝</p>
+    <div class="auth-tabs" style="display:flex;gap:0;margin-bottom:18px;background:#f5f5f5;border-radius:12px;padding:3px;">
+      <span class="atab active" onclick="switchAuthTab('login')" style="flex:1;text-align:center;padding:8px 0;font-size:14px;border-radius:10px;cursor:pointer;color:#999;transition:all .2s;" id="tabLogin">登录</span>
+      <span class="atab" onclick="switchAuthTab('register')" style="flex:1;text-align:center;padding:8px 0;font-size:14px;border-radius:10px;cursor:pointer;color:#999;transition:all .2s;" id="tabReg">注册</span>
+    </div>
+    <div id="registerForm">
+      <label>用户名</label>
+      <input type="text" id="regUsername" placeholder="取个可爱的名字..." maxlength="20">
+      <label>密码</label>
+      <input type="password" id="regPassword" placeholder="设置密码..." maxlength="32">
+      <label>确认密码</label>
+      <input type="password" id="regPassword2" placeholder="再输一次密码...">
+      <button class="setup-btn" onclick="doRegister()">✨ 注册</button>
+      <div id="regError" style="color:#e94560;font-size:12px;margin-top:8px;display:none;"></div>
+    </div>
+    <div id="loginForm" style="display:none;">
+      <label>用户名</label>
+      <input type="text" id="loginUsername" placeholder="输入用户名...">
+      <label>密码</label>
+      <input type="password" id="loginPassword" placeholder="输入密码...">
+      <button class="setup-btn" onclick="doLogin()">🔑 登录</button>
+      <div id="loginError" style="color:#e94560;font-size:12px;margin-top:8px;display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 个人设置弹窗（登录后） -->
+<div class="overlay" id="setupOverlay">
+  <div class="setup-card">
+    <h2>✧ 个人设置</h2>
+    <p class="sub">修改昵称和外观</p>
     <label>你的昵称</label>
     <input type="text" id="nickInput" placeholder="输入昵称..." maxlength="12">
     <label>选个头像</label>
     <div class="avatar-grid" id="avatarGrid"></div>
     <label>主题色</label>
     <div class="color-grid" id="colorGrid"></div>
-    <button class="setup-btn" id="setupConfirm">✨ 进入小窝</button>
+    <button class="setup-btn" id="setupConfirm">✨ 保存</button>
+    <button style="width:100%;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;color:#e94560;cursor:pointer;margin-top:10px;background:#fff5f5;border:1px solid #ffd0d0;" onclick="doLogout()">退出登录</button>
   </div>
 </div>
 
@@ -236,13 +268,69 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 const AVATARS = ['🌸','💜','🌟','🦋','🌙','🍀','🎀','🌈','💫','🧸','🌺','🐱','🦊','🐼','⭐','🌷'];
 const COLORS = ['#7C4DFF','#E94560','#FF6B9D','#4FC3F7','#FF9800','#66BB6A','#AB47BC','#26C6DA','#EF5350','#FFA726','#8D6E63','#78909C'];
 
-let user = (()=>{try{const r=localStorage.getItem('weibo_user');return r?JSON.parse(r):null}catch(e){return null}})();
+// ====== 认证系统 ======
+let token = localStorage.getItem('suisui_token') || '';
+let user = (()=>{try{const r=localStorage.getItem('suisui_user');return r?JSON.parse(r):null}catch(e){return null}})();
 let isPrivate = false;
 
-function saveUser(){localStorage.setItem('weibo_user',JSON.stringify(user))}
+function saveAuth(){localStorage.setItem('suisui_token',token);localStorage.setItem('suisui_user',JSON.stringify(user||{}));}
+function clearAuth(){token='';user=null;localStorage.removeItem('suisui_token');localStorage.removeItem('suisui_user');}
 
-// 设置弹窗
-const overlay=document.getElementById('setupOverlay');
+// 统一请求头（带Token）
+function authHeaders(){const h={'Content-Type':'application/json'};if(token)h['Authorization']='Bearer '+token;return h;}
+
+// ====== 登录/注册切换 ======
+function switchAuthTab(tab){
+  document.getElementById('tabLogin').classList.toggle('active',tab==='login');
+  document.getElementById('tabReg').classList.toggle('active',tab==='register');
+  document.getElementById('tabLogin').style.cssText=tab==='login'?'flex:1;text-align:center;padding:8px 0;font-size:14px;border-radius:10px;cursor:pointer;color:#7C4DFF;background:#fff;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:all .2s;':'flex:1;text-align:center;padding:8px 0;font-size:14px;border-radius:10px;cursor:pointer;color:#999;transition:all .2s;';
+  document.getElementById('tabReg').style.cssText=tab==='register'?'flex:1;text-align:center;padding:8px 0;font-size:14px;border-radius:10px;cursor:pointer;color:#7C4DFF;background:#fff;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:all .2s;':'flex:1;text-align:center;padding:8px 0;font-size:14px;border-radius:10px;cursor:pointer;color:#999;transition:all .2s;';
+  document.getElementById('registerForm').style.display=tab==='register'?'block':'none';
+  document.getElementById('loginForm').style.display=tab==='login'?'block':'none';
+  document.getElementById('regError').style.display='none';document.getElementById('loginError').style.display='none';
+}
+
+// 注册
+async function doRegister(){
+  const u=document.getElementById('regUsername').value.trim();
+  const p=document.getElementById('regPassword').value;
+  const p2=document.getElementById('regPassword2').value;
+  const errEl=document.getElementById('regError');
+  if(!u||!p)return showError(errEl,'请填写完整');
+  if(p!==p2)return showError(errEl,'两次密码不一致');
+  if(u.length<2)return showError(errEl,'用户名至少2个字符');
+  try{
+    const res=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await res.json();
+    if(d.error)return showError(errEl,d.error);
+    // 注册成功自动登录
+    token=d.token;user={name:u,avatar:'🌸',color:'#7C4DFF'};saveAuth();
+    document.getElementById('authOverlay').classList.remove('show');updateUI();loadPosts();toast('注册成功！欢迎 '+u+' ♡');
+  }catch(e){showError(errEl,'网络错误，请重试')}
+}
+
+// 登录
+async function doLogin(){
+  const u=document.getElementById('loginUsername').value.trim();
+  const p=document.getElementById('loginPassword').value;
+  const errEl=document.getElementById('loginError');
+  if(!u||!p)return showError(errEl,'请填写完整');
+  try{
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await res.json();
+    if(d.error)return showError(errEl,d.error);
+    token=d.token;user={name:d.username,avatar:user?.avatar||'🌸',color:user?.color||'#7C4DFF'};
+    saveAuth();document.getElementById('authOverlay').classList.remove('show');updateUI();loadPosts();toast('欢迎回来，'+d.username+' 💜');
+  }catch(e){showError(errEl,'网络错误，请重试')}
+}
+
+// 退出
+function doLogout(){if(!confirm('确定退出登录？'))return;clearAuth();document.getElementById('setupOverlay').classList.remove('show');document.getElementById('authOverlay').classList.add('show');location.reload()}
+
+function showError(el,msg){el.textContent=msg;el.style.display='block';}
+
+// ====== 个人设置（头像/颜色） ======
+const setupOverlay=document.getElementById('setupOverlay');
 function initSetup(){
   const cur=user||{avatar:'🌸',color:'#7C4DFF'};
   document.getElementById('avatarGrid').innerHTML=AVATARS.map(a=>`<div class="avatar-opt${a===cur.avatar?' selected':''}" data-avatar="${a}" onclick="pickAvatar(this)">${a}</div>`).join('');
@@ -253,13 +341,14 @@ function initSetup(){
 function pickAvatar(el){document.querySelectorAll('.avatar-opt').forEach(e=>e.classList.remove('selected'));el.classList.add('selected')}
 function pickColor(el){document.querySelectorAll('.color-opt').forEach(e=>e.classList.remove('selected'));el.classList.add('selected')}
 
-function showSetup(){initSetup();overlay.classList.add('show')}
+function showSetup(){if(!token){document.getElementById('authOverlay').classList.add('show')}else{initSetup();setupOverlay.classList.add('show')}}
 
 document.getElementById('setupConfirm').onclick=function(){
-  const name=document.getElementById('nickInput').value.trim()||'小可爱';
+  if(!token)return toast('请先登录');
+  const name=document.getElementById('nickInput').value.trim()||user.name||'小可爱';
   const avatar=document.querySelector('.avatar-opt.selected')?.dataset.avatar||'🌸';
   const color=document.querySelector('.color-opt.selected')?.dataset.color||'#7C4DFF';
-  user={name,avatar,color};saveUser();updateUI();overlay.classList.remove('show');
+  user={...user,name,avatar,color};saveAuth();updateUI();setupOverlay.classList.remove('show');toast('设置已保存 ✨');
 };
 
 function updateUI(){
@@ -279,7 +368,7 @@ function lighten(h,a){
 // 帖子
 async function loadPosts(){
   try{
-    const res=await fetch('/api/posts');
+    const res=await fetch('/api/posts',{headers:authHeaders()});
     const posts=await res.json();
     const c=document.getElementById('postsContainer');
     if(!posts.length){c.innerHTML='<div class="empty"><div class="big">💭</div>还没有碎碎念哦～<br>写一条开始吧 💜</div>';return;}
@@ -326,27 +415,30 @@ function toggleComment(id){
 }
 
 async function addPost(){
+  if(!token){document.getElementById('authOverlay').classList.add('show');return toast('请先登录')}
   const input=document.getElementById('postInput');
   const text=input.value.trim();
   if(!text) return toast('写点什么吧～');
   const mood=document.getElementById('moodSelect').value;
   const btn=document.getElementById('postBtn');btn.disabled=true;
-  await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,mood,visible:isPrivate?'private':'public',author:user?.name||'小可爱',avatar:user?.avatar||'🌸',color:user?.color||'#7C4DFF'})});
+  await fetch('/api/posts',{method:'POST',headers:authHeaders(),body:JSON.stringify({text,mood,visible:isPrivate?'private':'public'})});
   input.value='';document.getElementById('moodSelect').value='';btn.disabled=false;
   if(isPrivate){isPrivate=false;document.getElementById('visibleToggle').textContent='🌍 公开';document.getElementById('visibleToggle').style.borderColor='#e0e0e0';document.getElementById('visibleToggle').style.background='#fafafa';}
   loadPosts();toast('发布成功 ♡');
 }
 
 async function addComment(id){
+  if(!token){document.getElementById('authOverlay').classList.add('show');return toast('请先登录')}
   const input=document.getElementById('ci-'+id);
   const text=input.value.trim();if(!text) return;
-  await fetch(`/api/posts/${id}/comments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,name:user?.name||'小可爱',avatar:user?.avatar||'🌸',color:user?.color||'#7C4DFF'})});
+  await fetch(`/api/posts/${id}/comments`,{method:'POST',headers:authHeaders(),body:JSON.stringify({text})});
   input.value='';loadPosts();
 }
 
 async function deletePost(id){
+  if(!token){document.getElementById('authOverlay').classList.add('show');return toast('请先登录')}
   if(!confirm('确定要删除吗？')) return;
-  await fetch(`/api/posts/${id}`,{method:'DELETE'});loadPosts();toast('已删除');
+  await fetch(`/api/posts/${id}`,{method:'DELETE',headers:authHeaders()});loadPosts();toast('已删除');
 }
 
 function toggleVisible(){
@@ -360,9 +452,24 @@ function toggleVisible(){
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),1500);}
 
 // 初始化
-if(!user){showSetup()}else{updateUI()}
+if(!token){document.getElementById('authOverlay').classList.add('show')}else{updateUI();fetchUserInfo()}
 loadPosts();
 setInterval(loadPosts,15000);
+
+// 从后端获取最新用户信息
+async function fetchUserInfo(){
+  if(!token) return;
+  try{
+    const res=await fetch('/api/me',{headers:authHeaders()});
+    if(res.ok){
+      const d=await res.json();
+      if(d.username){
+        user={name:d.username,avatar:d.avatar||user?.avatar||'🌸',color:d.color||user?.color||'#7C4DFF'};
+        saveAuth();updateUI();
+      }
+    }
+  }catch(e){}
+}
 
 
 function switchPage(p){
@@ -386,13 +493,13 @@ function setToday(){
 }
 
 async function saveDiary(){
+  if(!token){document.getElementById('authOverlay').classList.add('show');return toast('请先登录')}
   var t=document.getElementById('diaryTitle').value.trim();
   var c=document.getElementById('diaryContent').value.trim();
   if(!c) return toast('写点内容吧～');
   var d=document.getElementById('diaryDate').value;
   var m=document.getElementById('diaryMood').value;
-  var cl=user?user.color:'#7C4DFF';
-  await fetch('/api/diaries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t,content:c,date:d,mood:m,color:cl})});
+  await fetch('/api/diaries',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:t,content:c,date:d,mood:m})});
   document.getElementById('diaryTitle').value='';
   document.getElementById('diaryContent').value='';
   document.getElementById('diaryMood').value='';
@@ -402,7 +509,7 @@ async function saveDiary(){
 
 async function loadDiaries(){
   try{
-    var res=await fetch('/api/diaries');
+    var res=await fetch('/api/diaries',{headers:authHeaders()});
     var list=await res.json();
     var c=document.getElementById('diariesContainer');
     if(!list.length){c.innerHTML='<div class="empty-state"><div class="big">📖</div>还没有日记～<br>写第一篇吧</div>';return;}
@@ -418,8 +525,9 @@ async function loadDiaries(){
 }
 
 async function deleteDiary(id){
+  if(!token){document.getElementById('authOverlay').classList.add('show');return toast('请先登录')}
   if(!confirm('确定删除？')) return;
-  await fetch('/api/diaries/'+id,{method:'DELETE'});
+  await fetch('/api/diaries/'+id,{method:'DELETE',headers:authHeaders()});
   loadDiaries();toast('已删除');
 }
 
@@ -428,7 +536,7 @@ var chatHistory=[];
 
 async function loadAgents(){
   try{
-    var res=await fetch('/api/agents');
+    var res=await fetch('/api/agents',{headers:authHeaders()});
     var list=await res.json();
     var c=document.getElementById('agentsContainer');
     if(!list.length){c.innerHTML='<div class="empty-state"><div class="big">🤖</div>还没有智能体～<br>点击下方添加吧</div>';return;}
@@ -483,7 +591,7 @@ document.getElementById('agentAvatarUpload').addEventListener('change', async fu
   var fd = new FormData();
   fd.append('file', file);
   try{
-    var res = await fetch('/api/upload', {method:'POST', body:fd});
+    var res = await fetch('/api/upload', {method:'POST', headers:{'Authorization':'Bearer '+token}, body:fd});
     var data = await res.json();
     if(data.url){
       uploadedAgentAvatar = data.url;
@@ -504,11 +612,12 @@ document.getElementById('agentAvatarUpload').addEventListener('change', async fu
 });
 
 async function saveAgent(){
+  if(!token){document.getElementById('authOverlay').classList.add('show');return toast('请先登录')}
   var n=document.getElementById('agentNameInput').value.trim()||'新智能体';
   var a=uploadedAgentAvatar||(document.querySelector('#agentAvatarGrid .selected')||{}).textContent||'🤖';
   var c=(document.querySelector('#agentColorGrid .selected')||{}).dataset?document.querySelector('#agentColorGrid .selected').style.background:'#7C4DFF';
   var p=document.getElementById('agentPromptInput').value.trim()||'你是一个温柔可爱的助手。';
-  await fetch('/api/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,avatar:a,color:c,prompt:p})});
+  await fetch('/api/agents',{method:'POST',headers:authHeaders(),body:JSON.stringify({name:n,avatar:a,color:c,prompt:p})});
   closeAgentModal();
   toast('智能体 '+n+' 已创建');
   loadAgents();
@@ -544,7 +653,7 @@ async function sendChat(){
   msgs.innerHTML+='<div class="chat-msg user"><div class="msg-bubble">'+txt+'</div></div>';
   msgs.scrollTop=msgs.scrollHeight;
   try{
-    var res=await fetch('/api/agents/'+currentAgentId+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:chatHistory.slice(-10)})});
+    var res=await fetch('/api/agents/'+currentAgentId+'/chat',{method:'POST',headers:authHeaders(),body:JSON.stringify({messages:chatHistory.slice(-10)})});
     var data=await res.json();
     if(data.reply){
       chatHistory.push({role:'assistant',content:data.reply});

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-碎碎念 · 云服务器版
-带日记 & 智能体功能（每个智能体可独立配置API）
+碎碎念 · 云服务器版（PostgreSQL + 用户系统）
+- 数据库：PostgreSQL（环境变量 DATABASE_URL）
+- 用户系统：注册/登录/Token认证
+- 数据隔离：每个用户只能操作自己的数据
+- 冷启动容错：Neon休眠唤醒自动重试
 """
-import os, json, uuid
+import os, hashlib, time
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 
@@ -14,113 +17,360 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
 AVATAR_DIR = os.path.join(UPLOAD_DIR, 'avatars')
 os.makedirs(AVATAR_DIR, exist_ok=True)
-# 数据目录 - 可通过环境变量 DATA_DIR 自定义（推荐绑定 Railway Volume 实现持久化）
-DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(BASE_DIR, 'data')
-DATA_FILE = os.path.join(DATA_DIR, 'data.json')
-os.makedirs(DATA_DIR, exist_ok=True)
 
-def load():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {"posts": [], "next_id": 1, "diaries": [], "next_diary_id": 1, "agents": [], "next_agent_id": 1}
+# ===== PostgreSQL（读取环境变量，禁止硬编码） =====
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+if not DATABASE_URL:
+    raise RuntimeError('❌ 请设置环境变量 DATABASE_URL（PostgreSQL连接串）')
 
-def save(d):
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(d, f, ensure_ascii=False, indent=2)
+import psycopg2
+import psycopg2.extras
+
+def get_conn(retries=3):
+    """获取数据库连接，支持重试（冷启动容错：指数退避）"""
+    for i in range(retries):
+        try:
+            conn = psycopg2.connect(DATABASE_URL, connect_timeout=8)
+            conn.autocommit = True
+            return conn
+        except Exception as e:
+            if i < retries - 1:
+                time.sleep(2 ** i)  # 1s, 2s, 4s
+                continue
+            raise e
+
+def init_db():
+    """启动时自动创建所有数据表"""
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(100) NOT NULL,
+                nickname VARCHAR(50) DEFAULT '',
+                avatar VARCHAR(50) DEFAULT '🌸',
+                color VARCHAR(20) DEFAULT '#7C4DFF',
+                token VARCHAR(64) UNIQUE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS posts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                text TEXT DEFAULT '',
+                mood VARCHAR(50) DEFAULT '',
+                time VARCHAR(20) DEFAULT '',
+                visible VARCHAR(20) DEFAULT 'public',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS comments (
+                id SERIAL PRIMARY KEY,
+                post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                text TEXT DEFAULT '',
+                time VARCHAR(20) DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS diaries (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                title TEXT DEFAULT '',
+                content TEXT DEFAULT '',
+                mood VARCHAR(50) DEFAULT '',
+                date VARCHAR(20) DEFAULT '',
+                time VARCHAR(20) DEFAULT '',
+                color VARCHAR(20) DEFAULT '#7C4DFF',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS agents (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                name VARCHAR(100) DEFAULT '新智能体',
+                avatar VARCHAR(200) DEFAULT '🤖',
+                color VARCHAR(20) DEFAULT '#7C4DFF',
+                prompt TEXT DEFAULT '你是一个温柔可爱的助手。',
+                api_key VARCHAR(500) DEFAULT '',
+                api_base_url VARCHAR(500) DEFAULT '',
+                model VARCHAR(100) DEFAULT '',
+                created VARCHAR(20) DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        # 索引
+        for idx in [
+            'idx_posts_user ON posts(user_id)',
+            'idx_posts_visible ON posts(visible)',
+            'idx_comments_post ON comments(post_id)',
+            'idx_diaries_user ON diaries(user_id)',
+            'idx_agents_user ON agents(user_id)',
+            'idx_users_token ON users(token)'
+        ]:
+            cur.execute(f'CREATE INDEX IF NOT EXISTS {idx}')
+        conn.commit()
+        print('✅ 数据库表初始化完成')
+    finally:
+        conn.close()
+
+init_db()
+
+# ===== 辅助函数 =====
+
+def gen_token():
+    return hashlib.sha256(os.urandom(32)).hexdigest()
+
+def get_current_user():
+    """从请求头 Authorization 获取当前登录用户"""
+    auth = request.headers.get('Authorization', '')
+    if auth.startswith('Bearer '):
+        token = auth[7:]
+        if token:
+            conn = get_conn()
+            try:
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute('SELECT id, username, nickname, avatar, color FROM users WHERE token = %s', (token,))
+                return cur.fetchone()
+            finally:
+                conn.close()
+    return None
 
 @app.route('/')
 def index():
     return send_from_directory(BASE_DIR, 'index.html')
 
+# ===== 用户系统 API =====
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    body = request.get_json(silent=True) or {}
+    username = body.get('username', '').strip()
+    password = body.get('password', '')
+    if len(username) < 2:
+        return jsonify({'error': '用户名至少2个字符'}), 400
+    if len(password) < 4:
+        return jsonify({'error': '密码至少4个字符'}), 400
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT id FROM users WHERE username = %s', (username,))
+        if cur.fetchone():
+            return jsonify({'error': '用户名已被注册'}), 409
+        token = gen_token()
+        pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+        cur.execute(
+            'INSERT INTO users (username, password, nickname, token) VALUES (%s, %s, %s, %s) RETURNING id, nickname, avatar, color',
+            (username, pwd_hash, username, token)
+        )
+        user = cur.fetchone()
+        conn.commit()
+        return jsonify({
+            'id': user['id'], 'username': username,
+            'nickname': user['nickname'], 'avatar': user['avatar'],
+            'color': user['color'], 'token': token
+        })
+    finally:
+        conn.close()
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    body = request.get_json(silent=True) or {}
+    username = body.get('username', '').strip()
+    password = body.get('password', '')
+    if not username or not password:
+        return jsonify({'error': '请输入用户名和密码'}), 400
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+        cur.execute('SELECT id, username, nickname, avatar, color, token FROM users WHERE username = %s AND password = %s', (username, pwd_hash))
+        user = cur.fetchone()
+        if not user:
+            return jsonify({'error': '用户名或密码错误'}), 401
+        return jsonify(dict(user))
+    finally:
+        conn.close()
+
+@app.route('/api/profile', methods=['GET', 'PUT'])
+def profile():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '未登录'}), 401
+    if request.method == 'GET':
+        return jsonify(user)
+    body = request.get_json(silent=True) or {}
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        for key in ['nickname', 'avatar', 'color']:
+            if key in body:
+                cur.execute(f'UPDATE users SET {key} = %s WHERE id = %s', (body[key], user['id']))
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        conn.close()
+
 # ===== 碎碎念 API =====
 
 @app.route('/api/posts', methods=['GET'])
 def get_posts():
-    d = load()
-    posts = sorted(d['posts'], key=lambda x: x['id'], reverse=True)
-    return jsonify(posts)
+    user = get_current_user()
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if user:
+            cur.execute("""
+                SELECT p.id, p.text, p.mood, p.time, p.visible,
+                       u.nickname AS author, u.avatar, u.color
+                FROM posts p JOIN users u ON p.user_id = u.id
+                WHERE p.visible = 'public' OR p.user_id = %s
+                ORDER BY p.id DESC
+            """, (user['id'],))
+        else:
+            cur.execute("""
+                SELECT p.id, p.text, p.mood, p.time, p.visible,
+                       u.nickname AS author, u.avatar, u.color
+                FROM posts p JOIN users u ON p.user_id = u.id
+                WHERE p.visible = 'public'
+                ORDER BY p.id DESC
+            """)
+        posts = []
+        for row in cur.fetchall():
+            post = dict(row)
+            c2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            c2.execute("""
+                SELECT c.text, c.time, u.nickname AS name, u.avatar, u.color
+                FROM comments c JOIN users u ON c.user_id = u.id
+                WHERE c.post_id = %s ORDER BY c.id
+            """, (post['id'],))
+            post['comments'] = [dict(r) for r in c2.fetchall()]
+            c2.close()
+            posts.append(post)
+        return jsonify(posts)
+    finally:
+        conn.close()
 
 @app.route('/api/posts', methods=['POST'])
 def add_post():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
     body = request.get_json(silent=True) or {}
-    d = load()
-    post = {
-        'id': d['next_id'],
-        'text': body.get('text', ''),
-        'mood': body.get('mood', ''),
-        'time': datetime.now().strftime('%m-%d %H:%M'),
-        'comments': [],
-        'author': body.get('author', ''),
-        'avatar': body.get('avatar', '🌸'),
-        'color': body.get('color', '#7C4DFF'),
-        'visible': body.get('visible', 'public')
-    }
-    d['posts'].append(post)
-    d['next_id'] += 1
-    save(d)
-    return jsonify(post)
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "INSERT INTO posts (user_id, text, mood, time, visible) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (user['id'], body.get('text', ''), body.get('mood', ''),
+             datetime.now().strftime('%m-%d %H:%M'), body.get('visible', 'public'))
+        )
+        post_id = cur.fetchone()['id']
+        conn.commit()
+        return jsonify({
+            'id': post_id, 'text': body.get('text', ''), 'mood': body.get('mood', ''),
+            'time': datetime.now().strftime('%m-%d %H:%M'),
+            'visible': body.get('visible', 'public'),
+            'author': user['nickname'], 'avatar': user['avatar'],
+            'color': user['color'], 'comments': []
+        })
+    finally:
+        conn.close()
 
 @app.route('/api/posts/<int:pid>/comments', methods=['POST'])
 def add_comment(pid):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
     body = request.get_json(silent=True) or {}
-    d = load()
-    for post in d['posts']:
-        if post['id'] == pid:
-            c = {
-                'name': body.get('name', ''),
-                'text': body.get('text', ''),
-                'time': datetime.now().strftime('%m-%d %H:%M'),
-                'avatar': body.get('avatar', '🌸'),
-                'color': body.get('color', '#7C4DFF')
-            }
-            post['comments'].append(c)
-            save(d)
-            return jsonify(c)
-    return 'Not found', 404
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "INSERT INTO comments (post_id, user_id, text, time) VALUES (%s, %s, %s, %s) RETURNING id",
+            (pid, user['id'], body.get('text', ''), datetime.now().strftime('%m-%d %H:%M'))
+        )
+        cid = cur.fetchone()['id']
+        conn.commit()
+        return jsonify({
+            'id': cid, 'text': body.get('text', ''),
+            'time': datetime.now().strftime('%m-%d %H:%M'),
+            'name': user['nickname'], 'avatar': user['avatar'], 'color': user['color']
+        })
+    finally:
+        conn.close()
 
 @app.route('/api/posts/<int:pid>', methods=['DELETE'])
 def delete_post(pid):
-    d = load()
-    d['posts'] = [x for x in d['posts'] if x['id'] != pid]
-    save(d)
-    return jsonify({'ok': True})
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM posts WHERE id = %s AND user_id = %s', (pid, user['id']))
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        conn.close()
 
 # ===== 日记 API =====
 
 @app.route('/api/diaries', methods=['GET'])
 def get_diaries():
-    d = load()
-    diaries = sorted(d.get('diaries', []), key=lambda x: x['id'], reverse=True)
-    return jsonify(diaries)
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM diaries WHERE user_id = %s ORDER BY id DESC', (user['id'],))
+        return jsonify([dict(r) for r in cur.fetchall()])
+    finally:
+        conn.close()
 
 @app.route('/api/diaries', methods=['POST'])
 def add_diary():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
     body = request.get_json(silent=True) or {}
-    d = load()
-    if 'diaries' not in d:
-        d['diaries'] = []
-        d['next_diary_id'] = 1
-    diary = {
-        'id': d['next_diary_id'],
-        'title': body.get('title', ''),
-        'content': body.get('content', ''),
-        'mood': body.get('mood', ''),
-        'date': body.get('date', datetime.now().strftime('%Y-%m-%d')),
-        'time': datetime.now().strftime('%H:%M'),
-        'color': body.get('color', '#7C4DFF')
-    }
-    d['diaries'].append(diary)
-    d['next_diary_id'] += 1
-    save(d)
-    return jsonify(diary)
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        now = datetime.now()
+        cur.execute(
+            "INSERT INTO diaries (user_id, title, content, mood, date, time, color) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            (user['id'], body.get('title', ''), body.get('content', ''),
+             body.get('mood', ''), body.get('date', now.strftime('%Y-%m-%d')),
+             now.strftime('%H:%M'), body.get('color', '#7C4DFF'))
+        )
+        diary = cur.fetchone()
+        conn.commit()
+        return jsonify(dict(diary))
+    finally:
+        conn.close()
 
 @app.route('/api/diaries/<int:did>', methods=['DELETE'])
 def delete_diary(did):
-    d = load()
-    d['diaries'] = [x for x in d.get('diaries', []) if x['id'] != did]
-    save(d)
-    return jsonify({'ok': True})
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM diaries WHERE id = %s AND user_id = %s', (did, user['id']))
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        conn.close()
 
 # ===== 智能体 API =====
 
@@ -162,86 +412,125 @@ def upload_file():
     if not f.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
         return jsonify({'error': '仅支持 PNG/JPG/GIF/WEBP 格式'}), 400
     ext = os.path.splitext(f.filename)[1]
-    filename = f'avatar_{uuid.uuid4().hex}{ext}'
+    filename = f'avatar_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}{ext}'
     f.save(os.path.join(AVATAR_DIR, filename))
     url = f'/uploads/avatars/{filename}'
     return jsonify({'url': url, 'filename': filename})
 
+# ===== 智能体 API =====
+
 @app.route('/api/agents', methods=['GET'])
 def get_agents():
-    d = load()
-    return jsonify(d.get('agents', []))
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM agents WHERE user_id = %s ORDER BY id DESC', (user['id'],))
+        return jsonify([dict(r) for r in cur.fetchall()])
+    finally:
+        conn.close()
 
 @app.route('/api/agents', methods=['POST'])
 def add_agent():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
     body = request.get_json(silent=True) or {}
-    d = load()
-    if 'agents' not in d:
-        d['agents'] = []
-        d['next_agent_id'] = 1
-    agent = {
-        'id': d['next_agent_id'],
-        'name': body.get('name', '新智能体'),
-        'avatar': body.get('avatar', '🤖'),
-        'color': body.get('color', '#7C4DFF'),
-        'prompt': body.get('prompt', '你是一个温柔可爱的助手。'),
-        'api_key': body.get('api_key', ''),
-        'api_base_url': body.get('api_base_url', ''),
-        'model': body.get('model', ''),
-        'created': datetime.now().strftime('%Y-%m-%d')
-    }
-    d['agents'].append(agent)
-    d['next_agent_id'] += 1
-    save(d)
-    return jsonify(agent)
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "INSERT INTO agents (user_id, name, avatar, color, prompt, api_key, api_base_url, model, created) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            (user['id'],
+             body.get('name', '新智能体'),
+             body.get('avatar', '🤖'),
+             body.get('color', '#7C4DFF'),
+             body.get('prompt', '你是一个温柔可爱的助手。'),
+             body.get('api_key', ''),
+             body.get('api_base_url', ''),
+             body.get('model', ''),
+             datetime.now().strftime('%Y-%m-%d'))
+        )
+        agent = cur.fetchone()
+        conn.commit()
+        return jsonify(dict(agent))
+    finally:
+        conn.close()
 
 @app.route('/api/agents/<int:aid>', methods=['PUT'])
 def update_agent(aid):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
     body = request.get_json(silent=True) or {}
-    d = load()
-    for agent in d.get('agents', []):
-        if agent['id'] == aid:
-            if 'name' in body: agent['name'] = body['name']
-            if 'avatar' in body: agent['avatar'] = body['avatar']
-            if 'color' in body: agent['color'] = body['color']
-            if 'prompt' in body: agent['prompt'] = body['prompt']
-            if 'api_key' in body: agent['api_key'] = body['api_key']
-            if 'api_base_url' in body: agent['api_base_url'] = body['api_base_url']
-            if 'model' in body: agent['model'] = body['model']
-            save(d)
-            return jsonify(agent)
-    return 'Not found', 404
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # 先验证归属
+        cur.execute('SELECT * FROM agents WHERE id = %s AND user_id = %s', (aid, user['id']))
+        agent = cur.fetchone()
+        if not agent:
+            return jsonify({'error': '智能体不存在'}), 404
+        updates = []
+        vals = []
+        for key in ['name', 'avatar', 'color', 'prompt', 'api_key', 'api_base_url', 'model']:
+            if key in body:
+                updates.append(f'{key} = %s')
+                vals.append(body[key])
+        if updates:
+            vals.append(aid)
+            vals.append(user['id'])
+            cur.execute(f'UPDATE agents SET {", ".join(updates)} WHERE id = %s AND user_id = %s', vals)
+            conn.commit()
+            cur.execute('SELECT * FROM agents WHERE id = %s', (aid,))
+            agent = cur.fetchone()
+        return jsonify(dict(agent))
+    finally:
+        conn.close()
 
 @app.route('/api/agents/<int:aid>', methods=['DELETE'])
 def delete_agent(aid):
-    d = load()
-    d['agents'] = [x for x in d.get('agents', []) if x['id'] != aid]
-    save(d)
-    return jsonify({'ok': True})
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM agents WHERE id = %s AND user_id = %s', (aid, user['id']))
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        conn.close()
 
 @app.route('/api/agents/<int:aid>/chat', methods=['POST'])
 def chat_with_agent(aid):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
     body = request.get_json(silent=True) or {}
-    d = load()
-    agent = None
-    for a in d.get('agents', []):
-        if a['id'] == aid:
-            agent = a
-            break
-    if not agent:
-        return jsonify({'error': '智能体不存在'}), 404
-    
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM agents WHERE id = %s AND user_id = %s', (aid, user['id']))
+        agent = cur.fetchone()
+        if not agent:
+            return jsonify({'error': '智能体不存在'}), 404
+    finally:
+        conn.close()
+
     messages = [{'role': 'system', 'content': agent['prompt']}]
     for msg in body.get('messages', []):
         messages.append({'role': msg.get('role', 'user'), 'content': msg.get('content', '')})
-    
+
     try:
         import requests
-        # 优先使用智能体自己的配置，没有则用环境变量或默认值
         api_key = agent.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
         base_url = agent.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
         model = agent.get('model') or os.environ.get('AI_MODEL', 'GLM-4.7-Flash')
-        
+
         resp = requests.post(
             f'{base_url}/chat/completions',
             headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},

@@ -128,6 +128,13 @@ def init_db():
         ]:
             cur.execute(f'CREATE INDEX IF NOT EXISTS {idx}')
         conn.commit()
+        # ★★ migration: users/agents 的 avatar 字段扩展为 TEXT（支持 base64 存储，部署不丢） ★★
+        for tbl, col in [('users','avatar'), ('agents','avatar')]:
+            try:
+                cur.execute(f"ALTER TABLE {tbl} ALTER COLUMN {col} TYPE TEXT")
+                print(f'  ✅ {tbl}.{col} 已扩展为 TEXT')
+            except Exception:
+                pass
         print('✅ 数据库表初始化完成')
     except Exception as e:
         print(f'⚠️ 数据库建表失败（{e}），可能权限不足')
@@ -430,11 +437,13 @@ def upload_file():
     # 只允许图片
     if not f.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
         return jsonify({'error': '仅支持 PNG/JPG/GIF/WEBP 格式'}), 400
-    ext = os.path.splitext(f.filename)[1]
-    filename = f'avatar_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}{ext}'
-    f.save(os.path.join(AVATAR_DIR, filename))
-    url = f'/uploads/avatars/{filename}'
-    return jsonify({'url': url, 'filename': filename})
+    # ★★ 改为 base64 存储，不依赖文件系统，Railway 部署不丢 ★★
+    ext = os.path.splitext(f.filename)[1].lstrip('.').lower()
+    if ext == 'jpg': ext = 'jpeg'
+    img_data = f.read()
+    b64 = base64.b64encode(img_data).decode()
+    data_url = f'data:image/{ext};base64,{b64}'
+    return jsonify({'url': data_url, 'filename': f.filename})
 
 # ===== 智能体 API =====
 

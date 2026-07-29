@@ -14,9 +14,13 @@ from flask import Flask, request, jsonify, send_from_directory
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
-AVATAR_DIR = os.path.join(UPLOAD_DIR, 'avatars')
+
+# ★★★ Railway 关键：必须使用 /tmp 目录，其他路径只读 ★★★
+UPLOAD_DIR = '/tmp/uploads'
+AVATAR_DIR = '/tmp/uploads/avatars'
 os.makedirs(AVATAR_DIR, exist_ok=True)
+
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制 16MB
 
 # ===== PostgreSQL（读取环境变量，禁止硬编码） =====
 DATABASE_URL = os.environ.get('DATABASE_URL', '')

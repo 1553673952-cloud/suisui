@@ -128,6 +128,15 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id SERIAL PRIMARY KEY,
+                agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+                role VARCHAR(20) DEFAULT 'user',
+                content TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         # 索引
         for idx in [
             'idx_posts_user ON posts(user_id)',
@@ -135,6 +144,7 @@ def init_db():
             'idx_comments_post ON comments(post_id)',
             'idx_diaries_user ON diaries(user_id)',
             'idx_agents_user ON agents(user_id)',
+            'idx_chat_messages_agent ON chat_messages(agent_id)',
             'idx_users_token ON users(token)'
         ]:
             cur.execute(f'CREATE INDEX IF NOT EXISTS {idx}')
@@ -551,6 +561,26 @@ def delete_agent(aid):
     finally:
         conn.close()
 
+@app.route('/api/agents/<int:aid>/messages', methods=['GET'])
+def get_agent_messages(aid):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # 验证智能体归属
+        cur.execute('SELECT id FROM agents WHERE id = %s AND user_id = %s', (aid, user['id']))
+        if not cur.fetchone():
+            return jsonify({'error': '智能体不存在'}), 404
+        cur.execute(
+            "SELECT role, content, created_at FROM chat_messages WHERE agent_id = %s ORDER BY id",
+            (aid,)
+        )
+        return jsonify([dict(r) for r in cur.fetchall()])
+    finally:
+        conn.close()
+
 @app.route('/api/agents/<int:aid>/chat', methods=['POST'])
 def chat_with_agent(aid):
     user = get_current_user()
@@ -588,7 +618,23 @@ def chat_with_agent(aid):
         api_key = agent.get('api_key') or user_config.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
         base_url = agent.get('api_base_url') or user_config.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
         # 根据base_url自动推断默认model（用户填DeepSeek则自动用deepseek-chat）
+        default_model = 'deepseek-chat' if 'deepseek' in base_url else 'GLM-4-Flash-250414'
         model = agent.get('model') or os.environ.get('AI_MODEL', default_model)
+
+        # 保存用户消息到数据库（只保存最新的那条，避免重复）
+        if body.get('messages'):
+            last_msg = body['messages'][-1]
+            if last_msg.get('role') in ('user', 'assistant'):
+                conn3 = get_conn()
+                try:
+                    c3 = conn3.cursor()
+                    c3.execute(
+                        "INSERT INTO chat_messages (agent_id, role, content) VALUES (%s, %s, %s)",
+                        (aid, last_msg['role'], last_msg.get('content', ''))
+                    )
+                    conn3.commit()
+                finally:
+                    conn3.close()
 
         resp = requests.post(
             f'{base_url}/chat/completions',
@@ -598,6 +644,19 @@ def chat_with_agent(aid):
         )
         result = resp.json()
         reply = result['choices'][0]['message']['content']
+
+        # 保存AI回复到数据库
+        conn4 = get_conn()
+        try:
+            c4 = conn4.cursor()
+            c4.execute(
+                "INSERT INTO chat_messages (agent_id, role, content) VALUES (%s, %s, %s)",
+                (aid, 'assistant', reply)
+            )
+            conn4.commit()
+        finally:
+            conn4.close()
+
         return jsonify({'reply': reply})
     except Exception as e:
         return jsonify({'error': f'AI 对话出错: {str(e)}'}), 500

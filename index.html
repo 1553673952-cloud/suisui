@@ -977,6 +977,21 @@ function openChat(id,name,color){
   document.querySelector('.add-agent-btn').style.display='none';
   document.getElementById('chatView').classList.add('show');
   document.getElementById('chatInput').focus();
+  // 从后端加载历史聊天记录
+  fetch('/api/agents/'+id+'/messages',{headers:authHeaders()}).then(function(r){return r.json()}).then(function(msgs){
+    if(msgs && msgs.length){
+      var el=document.getElementById('chatMessages');
+      msgs.forEach(function(m){
+        chatHistory.push({role:m.role,content:m.content});
+        if(m.role==='user'){
+          el.innerHTML+='<div class="chat-msg user"><div class="msg-bubble">'+m.content+'</div></div>';
+        }else if(m.role==='assistant'){
+          el.innerHTML+='<div class="chat-msg agent"><div class="msg-bubble">'+m.content+'</div></div>';
+        }
+      });
+      el.scrollTop=el.scrollHeight;
+    }
+  }).catch(function(){});
 }
 
 function closeChat(){

@@ -156,6 +156,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
     <div class="avatar-grid" id="avatarGrid"></div>
     <label>主题色</label>
     <div class="color-grid" id="colorGrid"></div>
+    <div style="margin-top:20px;padding-top:16px;border-top:2px dashed #eee;">
+      <p style="font-size:13px;font-weight:600;color:#666;margin-bottom:12px;text-align:left;">🤖 DeepSeek API 配置</p>
+      <p style="font-size:11px;color:#999;text-align:left;margin-bottom:8px;">设置后智能体将默认使用 DeepSeek 模型（每个智能体可单独覆盖）</p>
+      <label>API Key</label>
+      <input type="text" id="dsApiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;transition:border 0.2s;font-family:inherit;box-sizing:border-box;">
+      <label>Base URL</label>
+      <input type="text" id="dsBaseUrlInput" placeholder="https://api.deepseek.com" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;transition:border 0.2s;font-family:inherit;box-sizing:border-box;">
+    </div>
     <button class="setup-btn" id="setupConfirm">✨ 保存</button>
     <button style="width:100%;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;color:#e94560;cursor:pointer;margin-top:10px;background:#fff5f5;border:1px solid #ffd0d0;" onclick="doLogout()">退出登录</button>
   </div>
@@ -336,6 +344,8 @@ function initSetup(){
   document.getElementById('avatarGrid').innerHTML=AVATARS.map(a=>`<div class="avatar-opt${a===cur.avatar?' selected':''}" data-avatar="${a}" onclick="pickAvatar(this)">${a}</div>`).join('');
   document.getElementById('colorGrid').innerHTML=COLORS.map(c=>`<div class="color-opt${c===cur.color?' selected':''}" data-color="${c}" style="background:${c}" onclick="pickColor(this)"></div>`).join('');
   document.getElementById('nickInput').value=user?.name||'';
+  document.getElementById('dsApiKeyInput').value=user?.api_key||'';
+  document.getElementById('dsBaseUrlInput').value=user?.api_base_url||'';
 }
 
 function pickAvatar(el){document.querySelectorAll('.avatar-opt').forEach(e=>e.classList.remove('selected'));el.classList.add('selected')}
@@ -348,7 +358,11 @@ document.getElementById('setupConfirm').onclick=function(){
   const name=document.getElementById('nickInput').value.trim()||user.name||'小可爱';
   const avatar=document.querySelector('.avatar-opt.selected')?.dataset.avatar||'🌸';
   const color=document.querySelector('.color-opt.selected')?.dataset.color||'#7C4DFF';
-  user={...user,name,avatar,color};saveAuth();updateUI();setupOverlay.classList.remove('show');toast('设置已保存 ✨');
+  const api_key=document.getElementById('dsApiKeyInput').value.trim();
+  const api_base_url=document.getElementById('dsBaseUrlInput').value.trim();
+  user={...user,name,avatar,color,api_key,api_base_url};saveAuth();updateUI();
+  fetch('/api/profile',{method:'PUT',headers:authHeaders(),body:JSON.stringify({nickname:name,avatar,color,api_key,api_base_url})}).catch(e=>{});
+  setupOverlay.classList.remove('show');toast('设置已保存 ✨');
 };
 
 function updateUI(){
@@ -460,11 +474,11 @@ setInterval(loadPosts,15000);
 async function fetchUserInfo(){
   if(!token) return;
   try{
-    const res=await fetch('/api/me',{headers:authHeaders()});
+    const res=await fetch('/api/profile',{headers:authHeaders()});
     if(res.ok){
       const d=await res.json();
       if(d.username){
-        user={name:d.username,avatar:d.avatar||user?.avatar||'🌸',color:d.color||user?.color||'#7C4DFF'};
+        user={name:d.username,avatar:d.avatar||user?.avatar||'🌸',color:d.color||user?.color||'#7C4DFF',api_key:d.api_key||'',api_base_url:d.api_base_url||''};
         saveAuth();updateUI();
       }
     }

@@ -36,6 +36,10 @@ def get_conn(retries=3):
         try:
             conn = psycopg2.connect(DATABASE_URL, connect_timeout=8)
             conn.autocommit = True
+            # ★ Neon免费版：每次连接设置search_path到自定义schema ★
+            cur = conn.cursor()
+            cur.execute("SET search_path TO sui")
+            cur.close()
             return conn
         except Exception as e:
             if i < retries - 1:
@@ -48,11 +52,9 @@ def init_db():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        # ★★★ Neon免费版默认没有public schema的CREATE权限，先尝试授权 ★★★
-        try:
-            cur.execute("GRANT CREATE ON SCHEMA public TO CURRENT_USER")
-        except Exception:
-            pass  # 如果已有权限则忽略
+        # ★★★ Neon免费版无public权限，创建自定义schema并设为默认 ★★★
+        cur.execute("CREATE SCHEMA IF NOT EXISTS sui")
+        cur.execute("SET search_path TO sui")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,

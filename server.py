@@ -102,6 +102,12 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        # 图片支持迁移（老表加列）
+        for tbl in ['posts', 'diaries']:
+            try:
+                cur.execute(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS image TEXT DEFAULT ''")
+            except Exception:
+                pass  # 部分环境不支持 IF NOT EXISTS，忽略
         cur.execute("""
             CREATE TABLE IF NOT EXISTS agents (
                 id SERIAL PRIMARY KEY,
@@ -253,7 +259,7 @@ def get_posts():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         if user:
             cur.execute("""
-                SELECT p.id, p.text, p.mood, p.time, p.visible,
+                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image,
                        u.nickname AS author, u.avatar, u.color
                 FROM posts p JOIN users u ON p.user_id = u.id
                 WHERE p.visible = 'public' OR p.user_id = %s
@@ -261,7 +267,7 @@ def get_posts():
             """, (user['id'],))
         else:
             cur.execute("""
-                SELECT p.id, p.text, p.mood, p.time, p.visible,
+                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image,
                        u.nickname AS author, u.avatar, u.color
                 FROM posts p JOIN users u ON p.user_id = u.id
                 WHERE p.visible = 'public'
@@ -293,9 +299,10 @@ def add_post():
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "INSERT INTO posts (user_id, text, mood, time, visible) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            "INSERT INTO posts (user_id, text, mood, time, visible, image) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
             (user['id'], body.get('text', ''), body.get('mood', ''),
-             datetime.now().strftime('%m-%d %H:%M'), body.get('visible', 'public'))
+             datetime.now().strftime('%m-%d %H:%M'), body.get('visible', 'public'),
+             body.get('image', ''))
         )
         post_id = cur.fetchone()['id']
         conn.commit()
@@ -303,6 +310,7 @@ def add_post():
             'id': post_id, 'text': body.get('text', ''), 'mood': body.get('mood', ''),
             'time': datetime.now().strftime('%m-%d %H:%M'),
             'visible': body.get('visible', 'public'),
+            'image': body.get('image', ''),
             'author': user['nickname'], 'avatar': user['avatar'],
             'color': user['color'], 'comments': []
         })
@@ -372,11 +380,12 @@ def add_diary():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         now = datetime.now()
         cur.execute(
-            "INSERT INTO diaries (user_id, title, content, mood, date, time, color) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            "INSERT INTO diaries (user_id, title, content, mood, date, time, color, image) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
             (user['id'], body.get('title', ''), body.get('content', ''),
              body.get('mood', ''), body.get('date', now.strftime('%Y-%m-%d')),
-             now.strftime('%H:%M'), body.get('color', '#7C4DFF'))
+             now.strftime('%H:%M'), body.get('color', '#7C4DFF'),
+             body.get('image', ''))
         )
         diary = cur.fetchone()
         conn.commit()

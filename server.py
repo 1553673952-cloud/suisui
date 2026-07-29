@@ -48,6 +48,11 @@ def init_db():
     conn = get_conn()
     try:
         cur = conn.cursor()
+        # ★★★ Neon免费版默认没有public schema的CREATE权限，先尝试授权 ★★★
+        try:
+            cur.execute("GRANT CREATE ON SCHEMA public TO CURRENT_USER")
+        except Exception:
+            pass  # 如果已有权限则忽略
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,

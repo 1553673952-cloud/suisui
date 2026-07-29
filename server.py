@@ -108,6 +108,11 @@ def init_db():
                 cur.execute(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS image TEXT DEFAULT ''")
             except Exception:
                 pass  # 部分环境不支持 IF NOT EXISTS，忽略
+        # 日记公开/私密支持
+        try:
+            cur.execute("ALTER TABLE diaries ADD COLUMN IF NOT EXISTS visible VARCHAR(20) DEFAULT 'private'")
+        except Exception:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS agents (
                 id SERIAL PRIMARY KEY,
@@ -364,7 +369,12 @@ def get_diaries():
     conn = get_conn()
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute('SELECT * FROM diaries WHERE user_id = %s ORDER BY id DESC', (user['id'],))
+        cur.execute("""
+            SELECT d.*, u.nickname AS author, u.avatar AS user_avatar, u.color AS user_color
+            FROM diaries d JOIN users u ON d.user_id = u.id
+            WHERE d.user_id = %s OR d.visible = 'public'
+            ORDER BY d.id DESC
+        """, (user['id'],))
         return jsonify([dict(r) for r in cur.fetchall()])
     finally:
         conn.close()
@@ -380,12 +390,12 @@ def add_diary():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         now = datetime.now()
         cur.execute(
-            "INSERT INTO diaries (user_id, title, content, mood, date, time, color, image) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            "INSERT INTO diaries (user_id, title, content, mood, date, time, color, image, visible) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
             (user['id'], body.get('title', ''), body.get('content', ''),
              body.get('mood', ''), body.get('date', now.strftime('%Y-%m-%d')),
              now.strftime('%H:%M'), body.get('color', '#7C4DFF'),
-             body.get('image', ''))
+             body.get('image', ''), body.get('visible', 'private'))
         )
         diary = cur.fetchone()
         conn.commit()

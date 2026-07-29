@@ -282,6 +282,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
         <option value="💔 心碎">💔 心碎</option>
         <option value="😤 吃醋">😤 吃醋</option>
       </select>
+      <span id="diaryVisibleToggle" onclick="toggleDiaryVisible()" style="cursor:pointer;font-size:14px;padding:4px 10px;border-radius:14px;border:1px solid #e0e0e0;background:#fafafa;user-select:none;transition:all 0.2s;" title="点击切换可见性">🔒 私密</span>
       <button class="btn" style="background:linear-gradient(135deg,#7C4DFF,#B388FF)" onclick="saveDiary()">📝 保存</button>
     </div>
   </div>
@@ -375,6 +376,7 @@ function avatarHtml(v){
 let token = localStorage.getItem('suisui_token') || '';
 let user = (()=>{try{const r=localStorage.getItem('suisui_user');return r?JSON.parse(r):null}catch(e){return null}})();
 let isPrivate = false;
+let diaryIsPrivate = true;
 
 function saveAuth(){localStorage.setItem('suisui_token',token);localStorage.setItem('suisui_user',JSON.stringify(user||{}));}
 function clearAuth(){token='';user=null;localStorage.removeItem('suisui_token');localStorage.removeItem('suisui_user');}
@@ -665,6 +667,14 @@ function toggleVisible(){
   toast(isPrivate?'已设为仅自己可见 🔒':'已设为公开 🌍');
 }
 
+function toggleDiaryVisible(){
+  diaryIsPrivate=!diaryIsPrivate;
+  document.getElementById('diaryVisibleToggle').textContent=diaryIsPrivate?'🔒 私密':'🌍 公开';
+  document.getElementById('diaryVisibleToggle').style.borderColor=diaryIsPrivate?'#ff4444':'#e0e0e0';
+  document.getElementById('diaryVisibleToggle').style.background=diaryIsPrivate?'#fff5f5':'#fafafa';
+  toast(diaryIsPrivate?'日记已设为仅自己可见 🔒':'日记已设为公开 🌍');
+}
+
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),1500);}
 
 // 碎碎念图片处理
@@ -759,11 +769,12 @@ async function saveDiary(){
   var d=document.getElementById('diaryDate').value;
   var m=document.getElementById('diaryMood').value;
   var image=window.pendingDiaryImage||'';
-  await fetch('/api/diaries',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:t,content:c,date:d,mood:m,image})});
+  await fetch('/api/diaries',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:t,content:c,date:d,mood:m,image,visible:diaryIsPrivate?'private':'public'})});
   document.getElementById('diaryTitle').value='';
   document.getElementById('diaryContent').value='';
   document.getElementById('diaryMood').value='';
   clearDiaryImage();
+  diaryIsPrivate=true;document.getElementById('diaryVisibleToggle').textContent='🔒 私密';document.getElementById('diaryVisibleToggle').style.borderColor='#ff4444';document.getElementById('diaryVisibleToggle').style.background='#fff5f5';
   toast('日记已保存');
   loadDiaries();
 }
@@ -775,13 +786,24 @@ async function loadDiaries(){
     var c=document.getElementById('diariesContainer');
     if(!list.length){c.innerHTML='<div class="empty-state"><div class="big">📖</div>还没有日记～<br>写第一篇吧</div>';return;}
     c.innerHTML=list.map(function(d){
+      var isMine = user && d.author === user.name;
+      var visIcon = d.visible === 'public' ? '🌍' : '🔒';
+      var visTitle = d.visible === 'public' ? '公开' : '仅自己可见';
+      var authorColor = d.user_color || d.color || '#7C4DFF';
       return '<div class="diary-card" style="border-left:4px solid '+(d.color||'#7C4DFF')+'">'+
-        '<div class="diary-date">'+d.date+' '+d.time+'</div>'+
+        '<div class="diary-date">'+d.date+' '+d.time+
+        ' <span title="'+visTitle+'" style="font-size:12px;cursor:default;">'+visIcon+'</span>'+
+        '</div>'+
+        '<div style="font-size:12px;color:#999;margin-bottom:4px;">'+
+        '<span style="color:'+authorColor+'">'+(d.author||'未知用户')+'</span> '+
+        (d.visible==='private'?'<span style="background:#fff0f0;padding:0 6px;border-radius:8px;font-size:11px;">🔒 私密</span>':'')+
+        '</div>'+
         (d.title?'<div class="diary-title">'+d.title+'</div>':'')+
         (d.mood?'<div class="diary-mood" style="background:'+(d.color||'#7C4DFF')+'22;color:'+(d.color||'#7C4DFF')+'">'+d.mood+'</div>':'')+
         '<div class="diary-content">'+d.content+'</div>'+
         (d.image?'<div class="diary-image"><img src="'+d.image+'" alt="日记图片" loading="lazy"></div>':'')+
-        '<div class="diary-actions"><span onclick="deleteDiary('+d.id+')">🗑 删除</span></div></div>';
+        (isMine?'<div class="diary-actions"><span onclick="deleteDiary('+d.id+')">🗑 删除</span></div>':'')+
+        '</div>';
     }).join('');
   }catch(e){console.error(e)}
 }

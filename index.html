@@ -56,7 +56,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 .post .post-actions .delete:hover{color:#ff4444;}
 .comments{margin-top:10px;padding:10px 0 0;border-top:1px solid #f0f0f0;}
 .comment{font-size:14px;padding:6px 0;color:#555;line-height:1.5;}
-.comment .comment-author{font-weight:600;margin-right:6px;}
+.comment .comment-author{font-weight:600;margin-right:6px;display:inline-flex;align-items:center;gap:4px;}
+.comment .cmt-avatar{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;overflow:hidden;flex-shrink:0;}
 .comment .comment-time{font-size:11px;color:#ccc;margin-left:6px;}
 .comment-form{display:flex;gap:8px;margin-top:8px;align-items:center;}
 .comment-form input{flex:1;border:1px solid #e0e0e0;border-radius:18px;padding:8px 14px;font-size:13px;outline:none;transition:border 0.2s;}
@@ -178,7 +179,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 <div class="header">
   <div class="header-top">
     <h1>💭 碎碎念</h1>
-    <button class="me" id="meBtn" onclick="showSetup()">
+    <button class="me" id="meBtn" onclick="switchPage('settings')">
       <span class="mini-avatar" id="miniAvatar">🌸</span>
       <span id="miniName">我</span>
     </button>
@@ -188,6 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
     <span class="tab active" onclick="switchPage('murmur')">💭 碎碎念</span>
     <span class="tab" onclick="switchPage('diary')">📖 日记</span>
     <span class="tab" onclick="switchPage('agent')">🤖 智能体</span>
+    <span class="tab" onclick="switchPage('settings')">⚙️ 设置</span>
   </div>
 </div>
 
@@ -278,9 +280,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
     </div>
   </div>
 </div>
+
+<!-- 设置页面 -->
+<div id="page-settings" class="page">
+  <div class="setup-card" style="margin:12px;box-shadow:0 1px 6px rgba(0,0,0,0.06);">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div id="settingsAvatar" class="mini-avatar" style="width:64px;height:64px;font-size:28px;margin:0 auto 8px;background:#7C4DFF;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;">🌸</div>
+      <div style="font-size:18px;font-weight:600;color:#333;" id="settingsName"></div>
+    </div>
+    <label>你的昵称</label>
+    <input type="text" id="settingsNickInput" placeholder="输入昵称..." maxlength="12" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+    <label style="margin-top:16px;">选个头像</label>
+    <div class="avatar-grid" id="settingsAvatarGrid"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+      <input type="file" id="settingsAvatarUpload" accept="image/*" style="display:none">
+      <button type="button" id="settingsUploadBtn" onclick="document.getElementById('settingsAvatarUpload').click()" style="font-size:12px;padding:5px 14px;border:1px dashed #bbb;border-radius:14px;background:transparent;cursor:pointer;color:#999;">📷 上传头像</button>
+      <img id="settingsAvatarPreview" style="display:none;width:40px;height:40px;border-radius:50%;object-fit:cover;border:3px solid #7C4DFF;">
+      <span id="settingsAvatarStatus" style="font-size:11px;color:#999;"></span>
+    </div>
+    <label style="margin-top:16px;">主题色</label>
+    <div class="color-grid" id="settingsColorGrid"></div>
+    <details style="margin-top:20px;padding-top:16px;border-top:2px dashed #eee;">
+      <summary style="font-size:13px;font-weight:600;color:#666;cursor:pointer;padding:4px 0;">🤖 DeepSeek API 配置</summary>
+      <p style="font-size:11px;color:#999;margin:8px 0;text-align:left;">设置后智能体将默认使用 DeepSeek 模型</p>
+      <label>API Key</label>
+      <input type="text" id="settingsDsKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+      <label>Base URL</label>
+      <input type="text" id="settingsDsUrl" placeholder="https://api.deepseek.com" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+    </details>
+    <button class="setup-btn" id="settingsSaveBtn" style="margin-top:20px;">✨ 保存设置</button>
+    <button style="width:100%;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;color:#e94560;cursor:pointer;margin-top:10px;background:#fff5f5;border:1px solid #ffd0d0;" onclick="doLogout()">退出登录</button>
+  </div>
+</div>
+
 <script>
 const AVATARS = ['🌸','💜','🌟','🦋','🌙','🍀','🎀','🌈','💫','🧸','🌺','🐱','🦊','🐼','⭐','🌷'];
 const COLORS = ['#7C4DFF','#E94560','#FF6B9D','#4FC3F7','#FF9800','#66BB6A','#AB47BC','#26C6DA','#EF5350','#FFA726','#8D6E63','#78909C'];
+
+// 统一头像渲染：支持emoji和图片URL
+function avatarHtml(v){
+  if(v&&(v.startsWith('/uploads/')||v.startsWith('http')))
+    return '<img src="'+v+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  return v||'🌸';
+}
 
 // ====== 认证系统 ======
 let token = localStorage.getItem('suisui_token') || '';
@@ -377,6 +419,95 @@ document.getElementById('setupConfirm').onclick=function(){
   setupOverlay.classList.remove('show');toast('设置已保存 ✨');
 };
 
+// ====== 设置页面（独立） ======
+var uploadedSettingsAvatar = null;
+
+document.getElementById('settingsAvatarUpload').addEventListener('change', async function(e){
+  var file = e.target.files[0];
+  if(!file) return;
+  var btn = document.getElementById('settingsUploadBtn');
+  var status = document.getElementById('settingsAvatarStatus');
+  var preview = document.getElementById('settingsAvatarPreview');
+  btn.disabled = true;
+  status.textContent = '⏳ 上传中...';
+  var fd = new FormData();
+  fd.append('file', file);
+  try{
+    var res = await fetch('/api/upload', {method:'POST', headers:{'Authorization':'Bearer '+token}, body:fd});
+    var data = await res.json();
+    if(data.url){
+      uploadedSettingsAvatar = data.url;
+      preview.src = data.url;
+      preview.style.display = 'block';
+      status.textContent = '✅ 已上传';
+      status.style.color = '#4CAF50';
+      document.querySelectorAll('#settingsAvatarGrid .avatar-opt').forEach(function(el){el.classList.remove('selected')});
+    }else{
+      status.textContent = '❌ '+ (data.error||'失败');
+      status.style.color = '#f44336';
+    }
+  }catch(err){
+    status.textContent = '❌ '+err.message;
+    status.style.color = '#f44336';
+  }
+  btn.disabled = false;
+});
+
+function initSettingsPage(){
+  if(!user) return;
+  // 重置上传状态
+  uploadedSettingsAvatar=null;
+  document.getElementById('settingsAvatarPreview').style.display='none';
+  document.getElementById('settingsAvatarPreview').src='';
+  document.getElementById('settingsAvatarStatus').textContent='';
+  document.getElementById('settingsAvatarUpload').value='';
+  // 填充当前值
+  var cur=user;
+  document.getElementById('settingsNickInput').value=cur.name||'';
+  var av=cur.avatar||'🌸';
+  var avatarEl=document.getElementById('settingsAvatar');
+  if(av&&(av.startsWith('/uploads/')||av.startsWith('http'))){
+    avatarEl.innerHTML='<img src="'+av+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    avatarEl.style.background='none';
+  }else{
+    avatarEl.textContent=av;
+    avatarEl.style.background=cur.color||'#7C4DFF';
+  }
+  document.getElementById('settingsName').textContent=cur.name||'我';
+  document.getElementById('settingsAvatarGrid').innerHTML=AVATARS.map(a=>`<div class="avatar-opt${a===av?' selected':''}" data-avatar="${a}" onclick="pickSettingsAvatar(this)">${a}</div>`).join('');
+  document.getElementById('settingsColorGrid').innerHTML=COLORS.map(c=>`<div class="color-opt${c===cur.color?' selected':''}" data-color="${c}" style="background:${c}" onclick="pickSettingsColor(this)"></div>`).join('');
+  document.getElementById('settingsDsKey').value=cur.api_key||'';
+  document.getElementById('settingsDsUrl').value=cur.api_base_url||'';
+}
+
+function pickSettingsAvatar(el){
+  document.querySelectorAll('#settingsAvatarGrid .avatar-opt').forEach(function(e){e.classList.remove('selected')});
+  el.classList.add('selected');
+  // 预览
+  var avatarEl=document.getElementById('settingsAvatar');
+  avatarEl.innerHTML='';
+  avatarEl.textContent=el.textContent;
+  avatarEl.style.background=document.querySelector('#settingsColorGrid .selected')?.style.background||user?.color||'#7C4DFF';
+}
+function pickSettingsColor(el){
+  document.querySelectorAll('#settingsColorGrid .color-opt').forEach(function(e){e.classList.remove('selected')});
+  el.classList.add('selected');
+  document.getElementById('settingsAvatar').style.background=el.style.background;
+}
+
+document.getElementById('settingsSaveBtn').onclick=function(){
+  if(!token)return toast('请先登录');
+  var name=document.getElementById('settingsNickInput').value.trim()||user?.name||'小可爱';
+  var avatar=uploadedSettingsAvatar||document.querySelector('#settingsAvatarGrid .selected')?.dataset.avatar||user?.avatar||'🌸';
+  var color=document.querySelector('#settingsColorGrid .selected')?.dataset.color||user?.color||'#7C4DFF';
+  var api_key=document.getElementById('settingsDsKey').value.trim();
+  var api_base_url=document.getElementById('settingsDsUrl').value.trim();
+  user={...user,name,avatar,color,api_key,api_base_url};saveAuth();updateUI();
+  fetch('/api/profile',{method:'PUT',headers:authHeaders(),body:JSON.stringify({nickname:name,avatar,color,api_key,api_base_url})}).catch(e=>{});
+  toast('设置已保存 ✨');
+  initSettingsPage();
+};
+
 function updateUI(){
   if(!user) return;
   // 头像：支持图片URL或emoji
@@ -417,8 +548,8 @@ async function loadPosts(){
       return `<div class="post" data-id="${p.id}">
         <div class="post-header">
           <div class="post-author">
-            <div class="post-avatar" style="background:${cl}">${av}</div>
-            <div><div class="post-name" style="color:${cl}">${na}</div></div>
+            <div class="post-avatar" style="background:${cl}">${avatarHtml(av)}</div>
+             <div><div class="post-name" style="color:${cl}">${na}</div></div>
           </div>
           <span class="post-time">${p.time}</span>
         </div>
@@ -431,7 +562,7 @@ async function loadPosts(){
         </div>
         ${p.comments?.length?'<div class="comments">'+p.comments.map(c=>{
           const ca=c.color||'#7C4DFF';const caa=c.avatar||(c.name==='沈郁'?'💜':'🌸');
-          return `<div class="comment"><span class="comment-author" style="color:${ca}">${caa} ${c.name}</span>${c.text}<span class="comment-time">${c.time}</span></div>`;
+          return `<div class="comment"><span class="comment-author" style="color:${ca}"><span class="cmt-avatar">${avatarHtml(caa)}</span> ${c.name}</span>${c.text}<span class="comment-time">${c.time}</span></div>`;
         }).join('')+'</div>':''}
         <div class="comment-form" id="cf-${p.id}" style="display:none">
           <input type="text" id="ci-${p.id}" placeholder="写评论…" maxlength="200">
@@ -513,12 +644,13 @@ function switchPage(p){
   var tabs=document.querySelectorAll('.nav-tabs .tab');
   for(var i=0;i<tabs.length;i++){
     var txt=tabs[i].textContent;
-    if((p==='murmur'&&txt.indexOf('碎')>=0)||(p==='diary'&&txt.indexOf('记')>=0)||(p==='agent'&&txt.indexOf('智')>=0)){
+    if((p==='murmur'&&txt.indexOf('碎')>=0)||(p==='diary'&&txt.indexOf('记')>=0)||(p==='agent'&&txt.indexOf('智')>=0)||(p==='settings'&&txt.indexOf('设')>=0)){
       tabs[i].classList.add('active');
     }
   }
   if(p==='diary') loadDiaries();
   if(p==='agent') loadAgents();
+  if(p==='settings') initSettingsPage();
 }
 
 function setToday(){

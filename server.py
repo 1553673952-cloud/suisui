@@ -137,6 +137,26 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS friends (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                friend_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                status VARCHAR(20) DEFAULT 'pending',
+                action_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS private_messages (
+                id SERIAL PRIMARY KEY,
+                from_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                to_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                content TEXT DEFAULT '',
+                read BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         # 索引
         for idx in [
             'idx_posts_user ON posts(user_id)',
@@ -145,7 +165,12 @@ def init_db():
             'idx_diaries_user ON diaries(user_id)',
             'idx_agents_user ON agents(user_id)',
             'idx_chat_messages_agent ON chat_messages(agent_id)',
-            'idx_users_token ON users(token)'
+            'idx_users_token ON users(token)',
+            'idx_friends_user ON friends(user_id)',
+            'idx_friends_friend ON friends(friend_id)',
+            'idx_friends_status ON friends(status)',
+            'idx_pm_from ON private_messages(from_user_id)',
+            'idx_pm_to ON private_messages(to_user_id)'
         ]:
             cur.execute(f'CREATE INDEX IF NOT EXISTS {idx}')
         conn.commit()

@@ -403,8 +403,7 @@ def delete_diary(did):
 # 智谱AI免费模型列表
 FREE_MODELS = {
     'chat': [  # 可用于智能体对话
-        {'id': 'GLM-4.7-Flash', 'name': 'GLM-4.7-Flash', 'desc': '最新版免费对话模型'},
-        {'id': 'GLM-4-Flash-250414', 'name': 'GLM-4-Flash-250414', 'desc': 'GLM-4-Flash 2025-04-14版'},
+        {'id': 'GLM-4-Flash-250414', 'name': 'GLM-4-Flash-250414', 'desc': '最新版免费对话模型'},
         {'id': 'GLM-4.6V-Flash', 'name': 'GLM-4.6V-Flash', 'desc': '免费多模态（可看图片）'},
         {'id': 'GLM-4.1V-Thinking-Flash', 'name': 'GLM-4.1V-Thinking-Flash', 'desc': '免费多模态+深度思考'},
         {'id': 'GLM-4V-Flash', 'name': 'GLM-4V-Flash', 'desc': '免费视觉模型'},
@@ -570,7 +569,7 @@ def chat_with_agent(aid):
         api_key = agent.get('api_key') or user_config.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
         base_url = agent.get('api_base_url') or user_config.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
         # 根据base_url自动推断默认model（用户填DeepSeek则自动用deepseek-chat）
-        default_model = 'deepseek-v4-flash' if 'deepseek' in base_url else 'GLM-4.7-Flash'
+        default_model = 'deepseek-v4-flash' if 'deepseek' in base_url else 'GLM-4-Flash-250414'
         model = agent.get('model') or os.environ.get('AI_MODEL', default_model)
 
         resp = requests.post(

@@ -467,7 +467,6 @@ document.getElementById('setupConfirm').onclick=function(){
   fetch('/api/profile',{method:'PUT',headers:authHeaders(),body:JSON.stringify({nickname:name,avatar,color,api_key,api_base_url})}).catch(e=>{});
   setupOverlay.classList.remove('show');toast('设置已保存 ✨');
 };
-};
 
 // ====== 设置页面（独立） ======
 var uploadedSettingsAvatar = null;
@@ -852,6 +851,7 @@ async function loadAgents(){
     c.innerHTML='<div class="agent-grid">'+list.map(function(a){
       return `<div class="agent-card" onclick="openChat(${a.id},'${(a.name||'').replace(/'/g,"\\'")}','${a.color||"#7C4DFF"}')">`+
         '<div class="agent-avatar" style="background:'+(a.color||'#7C4DFF')+'">'+
+          ((a.avatar&&(a.avatar.startsWith('/uploads/')||a.avatar.startsWith('http')||a.avatar.startsWith('data:')))
             ?'<img src="'+a.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
             :(a.avatar||'🤖'))+'</div>'+
         '<div class="agent-name" style="color:'+(a.color||'#7C4DFF')+'">'+(a.name||'')+'</div>'+

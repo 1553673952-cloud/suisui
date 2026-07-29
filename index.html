@@ -335,9 +335,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 const AVATARS = ['🌸','💜','🌟','🦋','🌙','🍀','🎀','🌈','💫','🧸','🌺','🐱','🦊','🐼','⭐','🌷'];
 const COLORS = ['#7C4DFF','#E94560','#FF6B9D','#4FC3F7','#FF9800','#66BB6A','#AB47BC','#26C6DA','#EF5350','#FFA726','#8D6E63','#78909C'];
 
-// 统一头像渲染：支持emoji和图片URL
+// 统一头像渲染：支持 emoji / 图片 URL / base64 data URL
 function avatarHtml(v){
-  if(v&&(v.startsWith('/uploads/')||v.startsWith('http')))
+  if(v&&(v.startsWith('/uploads/')||v.startsWith('http')||v.startsWith('data:')))
     return '<img src="'+v+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
   return v||'🌸';
 }
@@ -484,7 +484,7 @@ function initSettingsPage(){
   document.getElementById('settingsNickInput').value=cur.name||'';
   var av=cur.avatar||'🌸';
   var avatarEl=document.getElementById('settingsAvatar');
-  if(av&&(av.startsWith('/uploads/')||av.startsWith('http'))){
+  if(av&&(av.startsWith('/uploads/')||av.startsWith('http')||av.startsWith('data:'))){
     avatarEl.innerHTML='<img src="'+av+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
     avatarEl.style.background='none';
   }else{
@@ -530,7 +530,7 @@ function updateUI(){
   if(!user) return;
   // 头像：支持图片URL或emoji
   var avatarEl=document.getElementById('miniAvatar');
-  if(user.avatar&&(user.avatar.startsWith('/uploads/')||user.avatar.startsWith('http'))){
+  if(user.avatar&&(user.avatar.startsWith('/uploads/')||user.avatar.startsWith('http')||user.avatar.startsWith('data:'))){
     avatarEl.innerHTML='<img src="'+user.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
     avatarEl.style.background='none';
   }else{
@@ -727,7 +727,7 @@ async function loadAgents(){
     c.innerHTML='<div class="agent-grid">'+list.map(function(a){
       return `<div class="agent-card" onclick="openChat(${a.id},'${(a.name||'').replace(/'/g,"\\'")}','${a.color||"#7C4DFF"}')">`+
         '<div class="agent-avatar" style="background:'+(a.color||'#7C4DFF')+'">'+
-          ((a.avatar&&(a.avatar.startsWith('/uploads/')||a.avatar.startsWith('http')))
+          ((a.avatar&&(a.avatar.startsWith('/uploads/')||a.avatar.startsWith('http')||a.avatar.startsWith('data:')))
             ?'<img src="'+a.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
             :(a.avatar||'🤖'))+'</div>'+
         '<div class="agent-name" style="color:'+(a.color||'#7C4DFF')+'">'+(a.name||'')+'</div>'+

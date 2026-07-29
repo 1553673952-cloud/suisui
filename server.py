@@ -155,7 +155,7 @@ def get_current_user():
             conn = get_conn()
             try:
                 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                cur.execute('SELECT id, username, nickname, avatar, color FROM users WHERE token = %s', (token,))
+                cur.execute('SELECT id, username, nickname, avatar, color, api_key, api_base_url FROM users WHERE token = %s', (token,))
                 return cur.fetchone()
             finally:
                 conn.close()
@@ -228,7 +228,7 @@ def profile():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        for key in ['nickname', 'avatar', 'color']:
+        for key in ['nickname', 'avatar', 'color', 'api_key', 'api_base_url']:
             if key in body:
                 cur.execute(f'UPDATE users SET {key} = %s WHERE id = %s', (body[key], user['id']))
         conn.commit()
@@ -546,8 +546,20 @@ def chat_with_agent(aid):
 
     try:
         import requests
-        api_key = agent.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
-        base_url = agent.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
+        # 优先级：智能体自己的配置 → 用户全局配置 → 环境变量默认值
+        user_config = {}
+        conn2 = get_conn()
+        try:
+            c2 = conn2.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            c2.execute('SELECT api_key, api_base_url FROM users WHERE id = %s', (user['id'],))
+            row = c2.fetchone()
+            if row:
+                user_config = dict(row)
+        finally:
+            conn2.close()
+
+        api_key = agent.get('api_key') or user_config.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
+        base_url = agent.get('api_base_url') or user_config.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
         model = agent.get('model') or os.environ.get('AI_MODEL', 'GLM-4.7-Flash')
 
         resp = requests.post(

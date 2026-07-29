@@ -577,22 +577,4 @@ def chat_with_agent(aid):
 
         api_key = agent.get('api_key') or user_config.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
         base_url = agent.get('api_base_url') or user_config.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
-        # 根据base_url自动推断默认model（用户填DeepSeek则自动用deepseek-chat）
-        default_model = 'deepseek-v4-flash' if 'deepseek' in base_url else 'GLM-4-Flash-250414'
-        model = agent.get('model') or os.environ.get('AI_MODEL', default_model)
-
-        resp = requests.post(
-            f'{base_url}/chat/completions',
-            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-            json={'model': model, 'messages': messages, 'max_tokens': 1024},
-            timeout=30
-        )
-        result = resp.json()
-        reply = result['choices'][0]['message']['content']
-        return jsonify({'reply': reply})
-    except Exception as e:
-        return jsonify({'error': f'AI 对话出错: {str(e)}'}), 500
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8792))
-    print(f'✨ 碎碎念服务已启动: http://0.0.0.0:{port}')
+<<<<<<< HEAD

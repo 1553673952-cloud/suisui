@@ -465,6 +465,7 @@ document.getElementById('setupConfirm').onclick=function(){
   fetch('/api/profile',{method:'PUT',headers:authHeaders(),body:JSON.stringify({nickname:name,avatar,color,api_key,api_base_url})}).catch(e=>{});
   setupOverlay.classList.remove('show');toast('设置已保存 ✨');
 };
+};
 
 // ====== 设置页面（独立） ======
 var uploadedSettingsAvatar = null;
@@ -553,7 +554,7 @@ document.getElementById('settingsSaveBtn').onclick=function(){
   fetch('/api/profile',{method:'PUT',headers:authHeaders(),body:JSON.stringify({nickname:name,avatar,color,api_key,api_base_url})}).catch(e=>{});
   toast('设置已保存 ✨');
   initSettingsPage();
-};
+}
 
 function updateUI(){
   if(!user) return;

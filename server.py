@@ -48,7 +48,8 @@ def get_conn(retries=3):
             raise e
 
 def init_db():
-    """启动时自动创建所有数据表"""
+    """启动时尝试建表，若权限不足则只警告（表须在Neon SQL Editor中手动创建）"""
+    print('⏳ 正在初始化数据库...')
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -128,10 +129,17 @@ def init_db():
             cur.execute(f'CREATE INDEX IF NOT EXISTS {idx}')
         conn.commit()
         print('✅ 数据库表初始化完成')
+    except Exception as e:
+        print(f'⚠️ 数据库建表失败（{e}），可能权限不足')
+        print('💡 请手动在Neon SQL Editor中执行建表SQL，详见文档')
     finally:
         conn.close()
 
-init_db()
+# ★ 不阻塞启动：即使init_db失败，app也能启动（表通过Neon SQL Editor手动建）
+try:
+    init_db()
+except Exception as e:
+    print(f'⚠️ init_db 异常（{e}），跳过建表，假设表已存在')
 
 # ===== 辅助函数 =====
 

@@ -881,6 +881,11 @@ def get_private_messages(other_id):
     finally:
         conn.close()
 
+@app.route('/api/ping', methods=['GET'])
+def ping():
+    """轻量心跳检测"""
+    return jsonify({'pong': True, 'time': str(datetime.utcnow())})
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8792))
     print(f'✨ 碎碎念服务已启动: http://0.0.0.0:{port}')

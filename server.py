@@ -578,7 +578,6 @@ def chat_with_agent(aid):
         api_key = agent.get('api_key') or user_config.get('api_key') or os.environ.get('AI_API_KEY', '30edd9feafb94229a1b2847f64b4e9d5.VbckSSfgvpTGHiTi')
         base_url = agent.get('api_base_url') or user_config.get('api_base_url') or os.environ.get('AI_API_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
         # 根据base_url自动推断默认model（用户填DeepSeek则自动用deepseek-chat）
-        default_model = 'deepseek-v4-flash' if 'deepseek' in base_url else 'GLM-4-Flash-250414'
         model = agent.get('model') or os.environ.get('AI_MODEL', default_model)
 
         resp = requests.post(

@@ -661,6 +661,201 @@ def chat_with_agent(aid):
     except Exception as e:
         return jsonify({'error': f'AI 对话出错: {str(e)}'}), 500
 
+# ====== 好友与私信系统 ======
+
+@app.route('/api/users/search', methods=['GET'])
+def search_users():
+    """搜索用户"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    q = request.args.get('q', '').strip()
+    if not q or len(q) < 1:
+        return jsonify([])
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT id, nickname, avatar, color FROM users WHERE id != %s AND nickname ILIKE %s LIMIT 20",
+            (user['id'], f'%{q}%')
+        )
+        return jsonify([dict(r) for r in cur.fetchall()])
+    finally:
+        conn.close()
+
+@app.route('/api/friends/request', methods=['POST'])
+def send_friend_request():
+    """发送好友请求"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    body = request.get_json(silent=True) or {}
+    friend_id = body.get('friend_id')
+    if not friend_id:
+        return jsonify({'error': '请指定好友'}), 400
+    if friend_id == user['id']:
+        return jsonify({'error': '不能添加自己为好友'}), 400
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT * FROM friends
+            WHERE (user_id = %s AND friend_id = %s) OR (user_id = %s AND friend_id = %s)
+        """, (user['id'], friend_id, friend_id, user['id']))
+        existing = cur.fetchone()
+        if existing:
+            if existing['status'] == 'accepted':
+                return jsonify({'error': '已经是好友了'}), 400
+            elif existing['status'] == 'pending':
+                return jsonify({'error': '已发送过好友请求'}), 400
+            else:
+                cur.execute("DELETE FROM friends WHERE id = %s", (existing['id'],))
+                conn.commit()
+        cur.execute('SELECT id FROM users WHERE id = %s', (friend_id,))
+        if not cur.fetchone():
+            return jsonify({'error': '用户不存在'}), 404
+        cur.execute(
+            "INSERT INTO friends (user_id, friend_id, status, action_user_id) VALUES (%s, %s, 'pending', %s)",
+            (user['id'], friend_id, user['id'])
+        )
+        conn.commit()
+        return jsonify({'ok': True, 'message': '好友请求已发送 ✨'})
+    finally:
+        conn.close()
+
+@app.route('/api/friends/requests', methods=['GET'])
+def get_friend_requests():
+    """获取好友请求列表"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT f.id, f.user_id, u.nickname, u.avatar, u.color, f.created_at
+            FROM friends f JOIN users u ON u.id = f.user_id
+            WHERE f.friend_id = %s AND f.status = 'pending'
+            ORDER BY f.created_at DESC
+        """, (user['id'],))
+        incoming = [dict(r) for r in cur.fetchall()]
+        cur.execute("""
+            SELECT f.id, f.friend_id AS user_id, u.nickname, u.avatar, u.color, f.created_at
+            FROM friends f JOIN users u ON u.id = f.friend_id
+            WHERE f.user_id = %s AND f.status = 'pending' AND f.action_user_id = %s
+            ORDER BY f.created_at DESC
+        """, (user['id'], user['id']))
+        outgoing = [dict(r) for r in cur.fetchall()]
+        return jsonify({'incoming': incoming, 'outgoing': outgoing})
+    finally:
+        conn.close()
+
+@app.route('/api/friends/respond', methods=['POST'])
+def respond_friend_request():
+    """处理好友请求"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    body = request.get_json(silent=True) or {}
+    request_id = body.get('request_id')
+    action = body.get('action')
+    if not request_id or action not in ('accept', 'reject'):
+        return jsonify({'error': '参数错误'}), 400
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM friends WHERE id = %s AND friend_id = %s AND status = 'pending'", (request_id, user['id']))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'error': '请求不存在或已处理'}), 404
+        if action == 'accept':
+            cur.execute("UPDATE friends SET status = 'accepted' WHERE id = %s", (request_id,))
+            conn.commit()
+            return jsonify({'ok': True, 'message': '已接受好友请求 🎉'})
+        else:
+            cur.execute("DELETE FROM friends WHERE id = %s", (request_id,))
+            conn.commit()
+            return jsonify({'ok': True, 'message': '已拒绝好友请求'})
+    finally:
+        conn.close()
+
+@app.route('/api/friends', methods=['GET'])
+def get_friends():
+    """获取好友列表"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT u.id, u.nickname, u.avatar, u.color
+            FROM friends f JOIN users u ON u.id = f.friend_id
+            WHERE f.user_id = %s AND f.status = 'accepted'
+            UNION
+            SELECT u.id, u.nickname, u.avatar, u.color
+            FROM friends f JOIN users u ON u.id = f.user_id
+            WHERE f.friend_id = %s AND f.status = 'accepted'
+            ORDER BY nickname
+        """, (user['id'], user['id']))
+        return jsonify([dict(r) for r in cur.fetchall()])
+    finally:
+        conn.close()
+
+@app.route('/api/messages/send', methods=['POST'])
+def send_private_message():
+    """发送私信"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    body = request.get_json(silent=True) or {}
+    to_user_id = body.get('to_user_id')
+    content = body.get('content', '').strip()
+    if not to_user_id or not content:
+        return jsonify({'error': '参数错误'}), 400
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id FROM friends
+            WHERE ((user_id = %s AND friend_id = %s) OR (user_id = %s AND friend_id = %s))
+            AND status = 'accepted'
+        """, (user['id'], to_user_id, to_user_id, user['id']))
+        if not cur.fetchone():
+            return jsonify({'error': '还不是好友，不能发消息'}), 403
+        cur.execute(
+            "INSERT INTO private_messages (from_user_id, to_user_id, content) VALUES (%s, %s, %s)",
+            (user['id'], to_user_id, content)
+        )
+        conn.commit()
+        return jsonify({'ok': True, 'message': '消息已发送'})
+    finally:
+        conn.close()
+
+@app.route('/api/messages/<int:other_id>', methods=['GET'])
+def get_private_messages(other_id):
+    """获取私信记录"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "UPDATE private_messages SET read = TRUE WHERE from_user_id = %s AND to_user_id = %s AND read = FALSE",
+            (other_id, user['id'])
+        )
+        conn.commit()
+        cur.execute("""
+            SELECT id, from_user_id, to_user_id, content, read, created_at
+            FROM private_messages
+            WHERE (from_user_id = %s AND to_user_id = %s) OR (from_user_id = %s AND to_user_id = %s)
+            ORDER BY id
+        """, (user['id'], other_id, other_id, user['id']))
+        return jsonify([dict(r) for r in cur.fetchall()])
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8792))
     print(f'✨ 碎碎念服务已启动: http://0.0.0.0:{port}')

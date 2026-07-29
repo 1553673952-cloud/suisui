@@ -122,6 +122,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 .modal-card .btn-cancel{background:#f5f5f5;color:#666;}
 .modal-card .btn-confirm{background:linear-gradient(135deg,#7C4DFF,#B388FF);color:#fff;}
 .empty-state{text-align:center;color:#ccc;padding:60px 20px;}
+.friend-search{margin:12px;background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
+.friend-search input{width:100%;border:2px solid #eee;border-radius:12px;padding:10px 14px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;}
+.friend-search input:focus{border-color:#7C4DFF;}
+.search-result-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5;}
+.search-result-item:last-child{border-bottom:none;}
+.search-result-item .mini-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:600;flex-shrink:0;}
+.search-result-item .name{flex:1;font-size:14px;font-weight:600;}
+.search-result-item .btn-sm{border:none;border-radius:16px;padding:6px 16px;font-size:12px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#7C4DFF,#B388FF);flex-shrink:0;}
+.search-result-item .btn-sm:disabled{opacity:.5;}
+.friend-section{margin:12px;background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
+.friend-section .section-title{font-size:13px;font-weight:600;color:#666;margin-bottom:10px;}
+.friend-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5;cursor:pointer;}
+.friend-item:last-child{border-bottom:none;}
+.friend-item:active{background:#fafafa;margin:-10px -14px;padding:10px 14px;border-radius:10px;}
+.friend-item .mini-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;flex-shrink:0;}
+.friend-item .name{flex:1;font-size:14px;font-weight:600;}
+.friend-item .badge{font-size:11px;color:#999;}
+.friend-chat-view{display:none;flex-direction:column;height:calc(100vh - 160px);position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:600px;background:#f5f5f5;z-index:200;animation:slideUp 0.3s ease;}
+.friend-chat-view.show{display:flex;}
+.friend-chat-view .chat-messages{flex:1;overflow-y:auto;padding:12px 16px;}
+.friend-chat-view .chat-msg.user{justify-content:flex-end;}
+.friend-chat-view .chat-msg.user .msg-bubble{background:#7C4DFF;color:#fff;border-radius:16px 16px 4px 16px;}
+.friend-chat-view .chat-msg.friend .msg-bubble{background:#fff;color:#333;border-radius:16px 16px 16px 4px;}
+.request-actions{display:flex;gap:8px;margin-left:auto;}
+.request-actions button{border:none;border-radius:14px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:600;}
+.request-actions .accept{background:#e8f5e9;color:#2e7d32;}
+.request-actions .reject{background:#fff0f0;color:#c62828;}
 </style>
 </head>
 <body>
@@ -199,6 +226,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
     <span class="tab active" onclick="switchPage('murmur')">💭 碎碎念</span>
     <span class="tab" onclick="switchPage('diary')">📖 日记</span>
     <span class="tab" onclick="switchPage('agent')">🤖 智能体</span>
+    <span class="tab" onclick="switchPage('friends')">👥 好友</span>
     <span class="tab" onclick="switchPage('settings')">⚙️ 设置</span>
   </div>
 </div>
@@ -361,6 +389,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
   </div>
 </div>
 
+<!-- 好友页面 -->
+<div id="page-friends" class="page">
+  <div class="friend-search">
+    <input type="text" id="friendSearchInput" placeholder="🔍 搜索用户..." oninput="searchUsers()" autocomplete="off">
+    <div id="friendSearchResults"></div>
+  </div>
+  <div id="friendRequestsSection"></div>
+  <div class="friend-section" id="friendsSection">
+    <div class="section-title">👥 我的好友</div>
+    <div id="friendsList"></div>
+  </div>
+</div>
+
+<!-- 好友私聊视图 -->
+<div class="friend-chat-view" id="friendChatView">
+  <div class="chat-header">
+    <span class="back" onclick="closeFriendChat()">←</span>
+    <span class="chat-name" id="friendChatName"></span>
+  </div>
+  <div class="chat-messages" id="friendChatMessages"></div>
+  <div class="chat-input-area">
+    <input type="text" id="friendChatInput" placeholder="发送消息..." onkeydown="if(event.key==='Enter')sendFriendMessage()">
+    <button onclick="sendFriendMessage()">发送</button>
+  </div>
+</div>
+
 <script>
 const AVATARS = ['🌸','💜','🌟','🦋','🌙','🍀','🎀','🌈','💫','🧸','🌺','🐱','🦊','🐼','⭐','🌷'];
 const COLORS = ['#7C4DFF','#E94560','#FF6B9D','#4FC3F7','#FF9800','#66BB6A','#AB47BC','#26C6DA','#EF5350','#FFA726','#8D6E63','#78909C'];
@@ -409,7 +463,7 @@ async function doRegister(){
     const d=await res.json();
     if(d.error)return showError(errEl,d.error);
     // 注册成功自动登录
-    token=d.token;user={name:u,avatar:'🌸',color:'#7C4DFF'};saveAuth();
+    token=d.token;user={id:d.id,name:u,avatar:'🌸',color:'#7C4DFF'};saveAuth();
     document.getElementById('authOverlay').classList.remove('show');updateUI();loadPosts();toast('注册成功！欢迎 '+u+' ♡');
   }catch(e){showError(errEl,'网络错误，请重试')}
 }
@@ -424,7 +478,7 @@ async function doLogin(){
     const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
     const d=await res.json();
     if(d.error)return showError(errEl,d.error);
-    token=d.token;user={name:d.username,avatar:user?.avatar||'🌸',color:user?.color||'#7C4DFF'};
+    token=d.token;user={id:d.id,name:d.username,avatar:user?.avatar||'🌸',color:user?.color||'#7C4DFF'};
     saveAuth();document.getElementById('authOverlay').classList.remove('show');updateUI();loadPosts();toast('欢迎回来，'+d.username+' 💜');
   }catch(e){showError(errEl,'网络错误，请重试')}
 }
@@ -731,7 +785,7 @@ async function fetchUserInfo(){
     if(res.ok){
       const d=await res.json();
       if(d.username){
-        user={name:d.username,avatar:d.avatar||user?.avatar||'🌸',color:d.color||user?.color||'#7C4DFF',api_key:d.api_key||'',api_base_url:d.api_base_url||''};
+        user={id:d.id,name:d.username,avatar:d.avatar||user?.avatar||'🌸',color:d.color||user?.color||'#7C4DFF',api_key:d.api_key||'',api_base_url:d.api_base_url||''};
         saveAuth();updateUI();
       }
     }
@@ -746,12 +800,13 @@ function switchPage(p){
   var tabs=document.querySelectorAll('.nav-tabs .tab');
   for(var i=0;i<tabs.length;i++){
     var txt=tabs[i].textContent;
-    if((p==='murmur'&&txt.indexOf('碎')>=0)||(p==='diary'&&txt.indexOf('记')>=0)||(p==='agent'&&txt.indexOf('智')>=0)||(p==='settings'&&txt.indexOf('设')>=0)){
+    if((p==='murmur'&&txt.indexOf('碎')>=0)||(p==='diary'&&txt.indexOf('记')>=0)||(p==='agent'&&txt.indexOf('智')>=0)||(p==='friends'&&txt.indexOf('好')>=0)||(p==='settings'&&txt.indexOf('设')>=0)){
       tabs[i].classList.add('active');
     }
   }
   if(p==='diary') loadDiaries();
   if(p==='agent') loadAgents();
+  if(p==='friends'){ loadFriends(); loadFriendRequests(); }
   if(p==='settings') initSettingsPage();
 }
 
@@ -1035,6 +1090,162 @@ async function sendChat(){
   }
   msgs.scrollTop=msgs.scrollHeight;
   btn.disabled=false;
+}
+
+// ====== 好友与私信系统 ======
+let currentFriendId = null;
+let searchTimer = null;
+
+function searchUsers(){
+  var q=document.getElementById('friendSearchInput').value.trim();
+  var el=document.getElementById('friendSearchResults');
+  if(!q){el.innerHTML='';return;}
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(async function(){
+    try{
+      var res=await fetch('/api/users/search?q='+encodeURIComponent(q),{headers:authHeaders()});
+      var data=await res.json();
+      if(!data || !data.length){el.innerHTML='<div style="padding:10px 0;color:#999;font-size:13px;">没有找到用户</div>';return;}
+      var html='';
+      for(var i=0;i<data.length;i++){
+        var u=data[i];
+        html+='<div class="search-result-item">'+
+          '<div class="mini-avatar" style="background:'+u.color+'">'+avatarHtml(u.avatar)+'</div>'+
+          '<span class="name">'+u.nickname+'</span>'+
+          '<button class="btn-sm" id="freq_'+u.id+'" onclick="sendFriendRequest('+u.id+',this)">➕ 加好友</button>'+
+        '</div>';
+      }
+      el.innerHTML=html;
+    }catch(e){el.innerHTML='<div style="padding:10px 0;color:#c00;font-size:13px;">搜索失败</div>';}
+  },300);
+}
+
+async function sendFriendRequest(friendId,btn){
+  if(btn) btn.disabled=true;
+  try{
+    var res=await fetch('/api/friends/request',{method:'POST',headers:authHeaders(),body:JSON.stringify({friend_id:friendId})});
+    var data=await res.json();
+    if(data.ok){toast(data.message);if(btn)btn.textContent='已发送 ✓';}
+    else toast(data.error||'请求失败');
+  }catch(e){toast('网络错误');}
+  if(btn) setTimeout(function(){btn.disabled=false;},2000);
+}
+
+async function loadFriends(){
+  var el=document.getElementById('friendsList');
+  if(!el) return;
+  try{
+    var res=await fetch('/api/friends',{headers:authHeaders()});
+    var data=await res.json();
+    if(!data || !data.length){
+      el.innerHTML='<div class="empty-state" style="padding:40px 20px;">还没有好友～去搜索添加吧！🔍</div>';
+      return;
+    }
+    var html='';
+    for(var i=0;i<data.length;i++){
+      var f=data[i];
+      html+='<div class="friend-item" onclick="openFriendChat('+f.id+',\''+f.nickname.replace(/'/g,"\\'")+'\')">'+
+        '<div class="mini-avatar" style="background:'+f.color+'">'+avatarHtml(f.avatar)+'</div>'+
+        '<span class="name">'+f.nickname+'</span>'+
+        '<span class="badge">💬 发消息</span>'+
+      '</div>';
+    }
+    el.innerHTML=html;
+  }catch(e){el.innerHTML='<div style="padding:20px;color:#c00;">加载好友列表失败</div>';}
+}
+
+async function loadFriendRequests(){
+  var el=document.getElementById('friendRequestsSection');
+  if(!el) return;
+  try{
+    var res=await fetch('/api/friends/requests',{headers:authHeaders()});
+    var data=await res.json();
+    var html='';
+    if(data.incoming && data.incoming.length){
+      html+='<div class="friend-section"><div class="section-title">📩 好友请求</div>';
+      for(var i=0;i<data.incoming.length;i++){
+        var r=data.incoming[i];
+        html+='<div class="search-result-item">'+
+          '<div class="mini-avatar" style="background:'+r.color+'">'+avatarHtml(r.avatar)+'</div>'+
+          '<span class="name">'+r.nickname+'</span>'+
+          '<div class="request-actions">'+
+            '<button class="accept" onclick="respondRequest('+r.id+',\'accept\',this)">✓ 接受</button>'+
+            '<button class="reject" onclick="respondRequest('+r.id+',\'reject\',this)">✕ 拒绝</button>'+
+          '</div></div>';
+      }
+      html+='</div>';
+    }
+    if(data.outgoing && data.outgoing.length){
+      html+='<div class="friend-section"><div class="section-title">⏳ 等待对方确认</div>';
+      for(var i=0;i<data.outgoing.length;i++){
+        var r=data.outgoing[i];
+        html+='<div class="search-result-item">'+
+          '<div class="mini-avatar" style="background:'+r.color+'">'+avatarHtml(r.avatar)+'</div>'+
+          '<span class="name">'+r.nickname+'</span>'+
+          '<span style="font-size:12px;color:#999;margin-left:auto;">等待中…</span>'+
+        '</div>';
+      }
+      html+='</div>';
+    }
+    el.innerHTML=html;
+  }catch(e){}
+}
+
+async function respondRequest(requestId,action,btn){
+  btn.disabled=true;
+  try{
+    var res=await fetch('/api/friends/respond',{method:'POST',headers:authHeaders(),body:JSON.stringify({request_id:requestId,action:action})});
+    var data=await res.json();
+    if(data.ok){toast(data.message);loadFriendRequests();loadFriends();}
+    else toast(data.error||'操作失败');
+  }catch(e){toast('网络错误');}
+}
+
+function openFriendChat(friendId,name){
+  currentFriendId=friendId;
+  document.getElementById('friendChatName').textContent='💬 '+name;
+  document.getElementById('friendChatMessages').innerHTML='';
+  document.getElementById('friendChatView').classList.add('show');
+  loadFriendMessages(friendId);
+}
+
+function closeFriendChat(){
+  currentFriendId=null;
+  document.getElementById('friendChatView').classList.remove('show');
+}
+
+async function loadFriendMessages(friendId){
+  var el=document.getElementById('friendChatMessages');
+  try{
+    var res=await fetch('/api/messages/'+friendId,{headers:authHeaders()});
+    var data=await res.json();
+    if(data && data.length){
+      for(var i=0;i<data.length;i++){
+        var m=data[i];
+        var isMe=(m.from_user_id===user.id);
+        var cls=isMe?'user':'friend';
+        el.innerHTML+='<div class="chat-msg '+cls+'"><div class="msg-bubble">'+m.content+'</div></div>';
+      }
+      el.scrollTop=el.scrollHeight;
+    }else{
+      el.innerHTML='<div style="text-align:center;color:#ccc;padding:40px;">开始聊天吧～💬</div>';
+    }
+  }catch(e){el.innerHTML='<div style="text-align:center;color:#c00;padding:20px;">加载消息失败</div>';}
+}
+
+async function sendFriendMessage(){
+  var inp=document.getElementById('friendChatInput');
+  var txt=inp.value.trim();
+  if(!txt || !currentFriendId) return;
+  inp.value='';
+  var el=document.getElementById('friendChatMessages');
+  el.innerHTML+='<div class="chat-msg user"><div class="msg-bubble">'+txt+'</div></div>';
+  el.scrollTop=el.scrollHeight;
+  try{
+    var res=await fetch('/api/messages/send',{method:'POST',headers:authHeaders(),body:JSON.stringify({to_user_id:currentFriendId,content:txt})});
+    var data=await res.json();
+    if(!data.ok) toast(data.error||'发送失败');
+  }catch(e){toast('网络错误');}
 }
 
 setToday();

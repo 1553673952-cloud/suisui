@@ -7,7 +7,7 @@
 - 数据隔离：每个用户只能操作自己的数据
 - 冷启动容错：Neon休眠唤醒自动重试
 """
-import os, hashlib, time
+import os, hashlib, time, base64
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 

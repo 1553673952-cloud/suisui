@@ -1105,14 +1105,13 @@ let searchTimer = null;
 let friendPollTimer = null;
 let lastMsgCount = 0;
 
-// 格式化时间
+// 格式化时间（自动转换到本地时区）
 function fmtTime(t){
   try{
     var d=new Date(t);
     if(isNaN(d.getTime())) return '';
-    var h=String(d.getHours()).padStart(2,'0');
-    var m=String(d.getMinutes()).padStart(2,'0');
-    return h+':'+m;
+    // 用toLocaleString自动处理时区转换
+    return d.toLocaleString('zh-CN', {hour:'2-digit', minute:'2-digit', hour12:false});
   }catch(e){return '';}
 }
 

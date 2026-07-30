@@ -64,6 +64,7 @@ def init_db():
                 nickname VARCHAR(50) DEFAULT '',
                 avatar VARCHAR(50) DEFAULT '🌸',
                 color VARCHAR(20) DEFAULT '#7C4DFF',
+                theme TEXT DEFAULT '{}',
                 token VARCHAR(64) UNIQUE,
                 created_at TIMESTAMP DEFAULT NOW()
             )
@@ -181,6 +182,12 @@ def init_db():
                 print(f'  ✅ {tbl}.{col} 已扩展为 TEXT')
             except Exception:
                 pass
+        # ★★ migration: 添加 theme 字段 ★★
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT '{}'")
+            print('  ✅ users.theme 字段已添加')
+        except Exception:
+            pass
         print('✅ 数据库表初始化完成')
     except Exception as e:
         print(f'⚠️ 数据库建表失败（{e}），可能权限不足')
@@ -208,7 +215,7 @@ def get_current_user():
             conn = get_conn()
             try:
                 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                cur.execute('SELECT id, username, nickname, avatar, color, api_key, api_base_url FROM users WHERE token = %s', (token,))
+                cur.execute('SELECT id, username, nickname, avatar, color, theme, api_key, api_base_url FROM users WHERE token = %s', (token,))
                 return cur.fetchone()
             finally:
                 conn.close()
@@ -276,14 +283,26 @@ def profile():
     if not user:
         return jsonify({'error': '未登录'}), 401
     if request.method == 'GET':
-        return jsonify(user)
+        import json
+        u = dict(user)
+        if isinstance(u.get('theme'), str) and u['theme']:
+            try:
+                u['theme'] = json.loads(u['theme'])
+            except Exception:
+                u['theme'] = {}
+        return jsonify(u)
     body = request.get_json(silent=True) or {}
     conn = get_conn()
     try:
         cur = conn.cursor()
-        for key in ['nickname', 'avatar', 'color', 'api_key', 'api_base_url']:
+        for key in ['nickname', 'avatar', 'color', 'theme', 'api_key', 'api_base_url']:
             if key in body:
-                cur.execute(f'UPDATE users SET {key} = %s WHERE id = %s', (body[key], user['id']))
+                val = body[key]
+                # theme 存 JSON 字符串
+                if key == 'theme' and isinstance(val, dict):
+                    import json
+                    val = json.dumps(val, ensure_ascii=False)
+                cur.execute(f'UPDATE users SET {key} = %s WHERE id = %s', (val, user['id']))
         conn.commit()
         return jsonify({'ok': True})
     finally:

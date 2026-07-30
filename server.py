@@ -413,6 +413,22 @@ def delete_post(pid):
     finally:
         conn.close()
 
+@app.route('/api/clean-all', methods=['POST'])
+def clean_all():
+    """一键清除当前用户的所有帖子和日记"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM posts WHERE user_id = %s', (user['id'],))
+        cur.execute('DELETE FROM diaries WHERE user_id = %s', (user['id'],))
+        conn.commit()
+        return jsonify({'ok': True, 'message': '已清除所有帖子和日记'})
+    finally:
+        conn.close()
+
 # ===== 日记 API =====
 
 @app.route('/api/diaries', methods=['GET'])

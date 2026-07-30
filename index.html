@@ -319,7 +319,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 </div>
 
 <div id="page-murmur" class="page active">
-<div class="post-form">
+<div id="guestBanner" style="display:none;padding:12px 16px;margin-bottom:12px;background:var(--card-bg,#fff);border-radius:14px;border:1px solid #f0f0f0;text-align:center;font-size:13px;color:var(--text-light,#999);">
+  💭 登录后即可记录你的碎碎念 ✨
+  <button onclick="document.getElementById('authOverlay').classList.add('show')" style="border:none;border-radius:10px;padding:6px 18px;font-size:12px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;margin-left:8px;vertical-align:middle;">🔑 登录</button>
+</div>
+<div class="post-form" id="postForm">
   <textarea id="postInput" placeholder="记录此刻的想法…" maxlength="500"></textarea>
   <div id="postImagePreview" class="image-preview" style="display:none">
     <img id="postImagePreviewImg" src="">
@@ -363,7 +367,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 </div>
 
 <div id="page-diary" class="page">
-  <div class="diary-form">
+  <div class="diary-form" id="diaryForm">
     <input type="date" id="diaryDate">
     <input type="text" id="diaryTitle" placeholder="日记标题…" maxlength="50">
     <textarea id="diaryContent" placeholder="写写今天的心情吧…" maxlength="5000"></textarea>
@@ -759,20 +763,40 @@ document.getElementById('settingsSaveBtn').onclick=function(){
 }
 
 function updateUI(){
-  if(!user) return;
-  // 头像：支持图片URL或emoji
-  var avatarEl=document.getElementById('miniAvatar');
-  if(user.avatar&&(user.avatar.startsWith('/uploads/')||user.avatar.startsWith('http')||user.avatar.startsWith('data:'))){
-    avatarEl.innerHTML='<img src="'+user.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
-    avatarEl.style.background='none';
-  }else{
-    avatarEl.textContent=user.avatar;
-    avatarEl.style.background='';
+  var guestBanner=document.getElementById('guestBanner');
+  var postForm=document.getElementById('postForm');
+  var diaryForm=document.getElementById('diaryForm');
+  var miniAvatar=document.getElementById('miniAvatar');
+  var miniName=document.getElementById('miniName');
+  var meBtn=document.getElementById('meBtn');
+  if(!user){
+    // 游客模式：显示登录入口，隐藏操作区
+    guestBanner.style.display='block';
+    if(postForm)postForm.style.display='none';
+    if(diaryForm)diaryForm.style.display='none';
+    miniAvatar.innerHTML='🔑';
+    miniAvatar.style.background='transparent';
+    miniName.textContent='登录';
+    meBtn.onclick=function(){document.getElementById('authOverlay').classList.add('show');};
+    return;
   }
-  document.getElementById('miniName').textContent=user.name;
+  // 已登录
+  guestBanner.style.display='none';
+  if(postForm)postForm.style.display='';
+  if(diaryForm)diaryForm.style.display='';
+  meBtn.onclick=function(){switchPage('settings');};
+  // 头像：支持图片URL或emoji
+  if(user.avatar&&(user.avatar.startsWith('/uploads/')||user.avatar.startsWith('http')||user.avatar.startsWith('data:'))){
+    miniAvatar.innerHTML='<img src="'+user.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    miniAvatar.style.background='none';
+  }else{
+    miniAvatar.textContent=user.avatar;
+    miniAvatar.style.background='';
+  }
+  miniName.textContent=user.name;
   document.querySelector('.mini-avatar').style.background=user.color;
-  const btn=document.getElementById('postBtn');
-  btn.style.background=`linear-gradient(135deg,${user.color},${lighten(user.color,40)})`;
+  var btn=document.getElementById('postBtn');
+  if(btn)btn.style.background='linear-gradient(135deg,'+user.color+','+lighten(user.color,40)+')';
 }
 
 function lighten(h,a){
@@ -786,7 +810,7 @@ async function loadPosts(){
     const res=await fetch('/api/posts',{headers:authHeaders()});
     const posts=await res.json();
     const c=document.getElementById('postsContainer');
-    if(!posts.length){c.innerHTML='<div class="empty"><div class="big">💭</div>还没有碎碎念哦～<br>写一条开始吧 💜</div>';return;}
+    if(!posts.length){c.innerHTML='<div class="empty"><div class="big">💭</div>'+(token?'还没有碎碎念哦～<br>写一条开始吧 💜':'还没有公开的碎碎念哦～<br><span style="font-size:13px;color:#bbb;">登录后可以发帖和大家互动 ✨</span>')+'</div>';return;}
     c.innerHTML=posts.map(p=>{
       const a=p.avatar||(p.author==='沈郁'?'💜':'🌸');
       const co=p.color||(p.author==='沈郁'?'#7C4DFF':'#FF6B9D');
@@ -919,8 +943,9 @@ function clearDiaryImage(){
   document.getElementById('diaryImageInput').value='';
 }
 
-// 初始化
-if(!token){document.getElementById('authOverlay').classList.add('show')}else{updateUI();fetchUserInfo()}
+// 初始化（游客模式：直接进主页，不弹登录框）
+updateUI();
+if(token) fetchUserInfo();
 loadPosts();
 setInterval(loadPosts,15000);
 
@@ -941,6 +966,11 @@ async function fetchUserInfo(){
 
 
 function switchPage(p){
+  // 游客访问需登录的页面时弹出登录
+  if(!token && (p==='settings'||p==='friends'||p==='agent')){
+    document.getElementById('authOverlay').classList.add('show');
+    return;
+  }
   document.querySelectorAll('.page').forEach(function(e){e.classList.remove('active')});
   document.querySelectorAll('.nav-tabs .tab').forEach(function(e){e.classList.remove('active')});
   document.getElementById('page-'+p).classList.add('active');

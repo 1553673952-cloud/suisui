@@ -8,10 +8,15 @@
 - 冷启动容错：Neon休眠唤醒自动重试
 """
 import os, hashlib, time, base64
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
+
+# 中国时区
+CN_TZ = timezone(timedelta(hours=8))
+def cn_time(fmt='%m-%d %H:%M'):
+    return datetime.now(CN_TZ).strftime(fmt)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -365,14 +370,14 @@ def add_post():
         cur.execute(
             "INSERT INTO posts (user_id, text, mood, time, visible, image, audio) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (user['id'], body.get('text', ''), body.get('mood', ''),
-             datetime.now().strftime('%m-%d %H:%M'), body.get('visible', 'public'),
+             datetime.now(CN_TZ).strftime('%m-%d %H:%M'), body.get('visible', 'public'),
              body.get('image', ''), body.get('audio', ''))
         )
         post_id = cur.fetchone()['id']
         conn.commit()
         return jsonify({
             'id': post_id, 'text': body.get('text', ''), 'mood': body.get('mood', ''),
-            'time': datetime.now().strftime('%m-%d %H:%M'),
+            'time': datetime.now(CN_TZ).strftime('%m-%d %H:%M'),
             'visible': body.get('visible', 'public'),
             'image': body.get('image', ''),
             'audio': body.get('audio', ''),
@@ -393,13 +398,13 @@ def add_comment(pid):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "INSERT INTO comments (post_id, user_id, text, time) VALUES (%s, %s, %s, %s) RETURNING id",
-            (pid, user['id'], body.get('text', ''), datetime.now().strftime('%m-%d %H:%M'))
+            (pid, user['id'], body.get('text', ''), datetime.now(CN_TZ).strftime('%m-%d %H:%M'))
         )
         cid = cur.fetchone()['id']
         conn.commit()
         return jsonify({
             'id': cid, 'text': body.get('text', ''),
-            'time': datetime.now().strftime('%m-%d %H:%M'),
+            'time': datetime.now(CN_TZ).strftime('%m-%d %H:%M'),
             'name': user['nickname'], 'avatar': user['avatar'], 'color': user['color']
         })
     finally:
@@ -470,7 +475,7 @@ def add_diary():
     conn = get_conn()
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        now = datetime.now()
+        now = datetime.now(CN_TZ)
         cur.execute(
             "INSERT INTO diaries (user_id, title, content, mood, date, time, color, image, visible) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
@@ -580,7 +585,7 @@ def add_agent():
              body.get('api_key', ''),
              body.get('api_base_url', ''),
              body.get('model', ''),
-             datetime.now().strftime('%Y-%m-%d'))
+             datetime.now(CN_TZ).strftime('%Y-%m-%d'))
         )
         agent = cur.fetchone()
         conn.commit()
@@ -931,7 +936,7 @@ def get_private_messages(other_id):
 @app.route('/api/ping', methods=['GET'])
 def ping():
     """轻量心跳检测"""
-    return jsonify({'pong': True, 'time': str(datetime.utcnow())})
+    return jsonify({'pong': True, 'time': str(datetime.now(CN_TZ))})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8792))

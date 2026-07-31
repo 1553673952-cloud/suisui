@@ -8,13 +8,14 @@
 - 冷启动容错：Neon休眠唤醒自动重试
 """
 import os, hashlib, time, base64
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
+import datetime as dt
 from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
 # 中国时区
-CN_TZ = timezone(timedelta(hours=8))
+CN_TZ = dt.timezone(dt.timedelta(hours=8))
 def cn_time(fmt='%m-%d %H:%M'):
     return datetime.now(CN_TZ).strftime(fmt)
 

@@ -109,6 +109,11 @@ def init_db():
                 cur.execute(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS image TEXT DEFAULT ''")
             except Exception:
                 pass  # 部分环境不支持 IF NOT EXISTS，忽略
+        # 语音支持迁移
+        try:
+            cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS audio TEXT DEFAULT ''")
+        except Exception:
+            pass
         # 日记公开/私密支持
         try:
             cur.execute("ALTER TABLE diaries ADD COLUMN IF NOT EXISTS visible VARCHAR(20) DEFAULT 'private'")
@@ -318,7 +323,7 @@ def get_posts():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         if user:
             cur.execute("""
-                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image,
+                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image, p.audio,
                        u.nickname AS author, u.avatar, u.color
                 FROM posts p JOIN users u ON p.user_id = u.id
                 WHERE p.visible = 'public' OR p.user_id = %s
@@ -326,7 +331,7 @@ def get_posts():
             """, (user['id'],))
         else:
             cur.execute("""
-                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image,
+                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image, p.audio,
                        u.nickname AS author, u.avatar, u.color
                 FROM posts p JOIN users u ON p.user_id = u.id
                 WHERE p.visible = 'public'
@@ -358,10 +363,10 @@ def add_post():
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "INSERT INTO posts (user_id, text, mood, time, visible, image) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+            "INSERT INTO posts (user_id, text, mood, time, visible, image, audio) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (user['id'], body.get('text', ''), body.get('mood', ''),
              datetime.now().strftime('%m-%d %H:%M'), body.get('visible', 'public'),
-             body.get('image', ''))
+             body.get('image', ''), body.get('audio', ''))
         )
         post_id = cur.fetchone()['id']
         conn.commit()
@@ -370,6 +375,7 @@ def add_post():
             'time': datetime.now().strftime('%m-%d %H:%M'),
             'visible': body.get('visible', 'public'),
             'image': body.get('image', ''),
+            'audio': body.get('audio', ''),
             'author': user['nickname'], 'avatar': user['avatar'],
             'color': user['color'], 'comments': []
         })
@@ -434,17 +440,23 @@ def clean_all():
 @app.route('/api/diaries', methods=['GET'])
 def get_diaries():
     user = get_current_user()
-    if not user:
-        return jsonify({'error': '请先登录'}), 401
     conn = get_conn()
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("""
-            SELECT d.*, u.nickname AS author, u.avatar AS user_avatar, u.color AS user_color
-            FROM diaries d JOIN users u ON d.user_id = u.id
-            WHERE d.user_id = %s OR d.visible = 'public'
-            ORDER BY d.id DESC
-        """, (user['id'],))
+        if user:
+            cur.execute("""
+                SELECT d.*, u.nickname AS author, u.avatar AS user_avatar, u.color AS user_color
+                FROM diaries d JOIN users u ON d.user_id = u.id
+                WHERE d.user_id = %s OR d.visible = 'public'
+                ORDER BY d.id DESC
+            """, (user['id'],))
+        else:
+            cur.execute("""
+                SELECT d.*, u.nickname AS author, u.avatar AS user_avatar, u.color AS user_color
+                FROM diaries d JOIN users u ON d.user_id = u.id
+                WHERE d.visible = 'public'
+                ORDER BY d.id DESC
+            """)
         return jsonify([dict(r) for r in cur.fetchall()])
     finally:
         conn.close()

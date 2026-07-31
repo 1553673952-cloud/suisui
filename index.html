@@ -236,6 +236,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
   #authOverlay .setup-card{padding:36px 40px;}
   #authOverlay .avatar-opt{width:48px;height:48px;font-size:24px;}
 }
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 </style>
 </head>
 <body>
@@ -336,6 +337,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
         <input type="file" id="postImageInput" accept="image/*" onchange="handlePostImage(this)" style="display:none">
         🖼️
       </label>
+      <span class="record-btn" id="recordBtn" title="录音" onclick="toggleRecord()" style="cursor:pointer;font-size:16px;padding:4px 10px;border-radius:14px;border:1px solid #e0e0e0;background:#fafafa;user-select:none;transition:all 0.2s;">🎤</span>
+      <span id="audioPreview" style="display:none;font-size:12px;color:#666;align-items:center;gap:4px;">🎵 <span id="audioName">语音</span><span onclick="clearAudio()" style="cursor:pointer;color:#e94560;margin-left:4px;">✕</span></span>
       <select class="mood-select" id="moodSelect">
         <option value="">💜 心情标签</option>
         <option value="😊 开心">😊 开心</option>
@@ -831,6 +834,7 @@ async function loadPosts(){
         </div>
         <div class="post-text">${p.text}</div>
         ${p.image?`<div class="post-image" onclick="window.open(this.querySelector('img').src)"><img src="${p.image}" alt="帖子图片" loading="lazy"></div>`:''}
+        ${p.audio?`<div class="post-audio"><audio controls src="${p.audio}" style="width:100%;height:36px;border-radius:10px;outline:none;"></audio></div>`:''}
         ${p.visible==='private'&&isMe?'<div style="font-size:12px;color:#999;margin:4px 0 0;"><span style="background:#fff0f0;padding:2px 10px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;">🔒 仅自己可见</span></div>':''}
         ${p.mood?`<div class="post-mood" style="background:${cl}22;color:${cl}">${p.mood}</div>`:''}
         <div class="post-actions">
@@ -861,12 +865,13 @@ async function addPost(){
   const input=document.getElementById('postInput');
   const text=input.value.trim();
   const image=window.pendingPostImage||'';
-  if(!text && !image) return toast('写点什么或传张图吧～');
+  const audio=window.pendingAudio||'';
+  if(!text && !image && !audio) return toast('写点什么、传张图或录段语音吧～');
   const mood=document.getElementById('moodSelect').value;
   const btn=document.getElementById('postBtn');btn.disabled=true;
-  await fetch('/api/posts',{method:'POST',headers:authHeaders(),body:JSON.stringify({text,mood,visible:isPrivate?'private':'public',image})});
+  await fetch('/api/posts',{method:'POST',headers:authHeaders(),body:JSON.stringify({text,mood,visible:isPrivate?'private':'public',image,audio})});
   input.value='';document.getElementById('moodSelect').value='';btn.disabled=false;
-  clearPostImage();
+  clearPostImage();clearAudio();
   if(isPrivate){isPrivate=false;document.getElementById('visibleToggle').textContent='🌍 公开';document.getElementById('visibleToggle').style.borderColor='#e0e0e0';document.getElementById('visibleToggle').style.background='#fafafa';}
   loadPosts();toast('发布成功 ♡');
 }
@@ -922,6 +927,52 @@ function clearPostImage(){
   document.getElementById('postImagePreview').style.display='none';
   document.getElementById('postImagePreviewImg').src='';
   document.getElementById('postImageInput').value='';
+}
+
+// ====== 语音录制 ======
+let mediaRecorder=null,audioChunks=[];
+async function toggleRecord(){
+  const btn=document.getElementById('recordBtn');
+  if(mediaRecorder&&mediaRecorder.state==='recording'){
+    // 停止录音
+    mediaRecorder.stop();
+    btn.textContent='🎤';btn.style.background='#fafafa';btn.style.color='';
+    btn.style.animation='';
+    return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder=new MediaRecorder(stream,{mimeType:'audio/webm;codecs=opus'});
+    audioChunks=[];
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0)audioChunks.push(e.data);};
+    mediaRecorder.onstop=()=>{
+      const blob=new Blob(audioChunks,{type:'audio/webm'});
+      const reader=new FileReader();
+      reader.onload=()=>{
+        window.pendingAudio=reader.result;
+        document.getElementById('audioPreview').style.display='inline-flex';
+        document.getElementById('audioName').textContent='语音('+Math.round(blob.size/1024)+'KB)';
+      };
+      reader.readAsDataURL(blob);
+      stream.getTracks().forEach(t=>t.stop());
+    };
+    mediaRecorder.start();
+    btn.textContent='🔴';btn.style.background='#fff0f0';btn.style.borderColor='#ff4444';
+    btn.style.animation='pulse 1s infinite';
+    toast('正在录音...再次点击停止');
+  }catch(e){
+    toast('无法访问麦克风💔 请检查浏览器权限');
+    console.error(e);
+  }
+}
+function clearAudio(){
+  window.pendingAudio=null;
+  document.getElementById('audioPreview').style.display='none';
+  if(mediaRecorder){mediaRecorder=null;audioChunks=[];}
+  document.getElementById('recordBtn').textContent='🎤';
+  document.getElementById('recordBtn').style.background='#fafafa';
+  document.getElementById('recordBtn').style.borderColor='#e0e0e0';
+  document.getElementById('recordBtn').style.animation='';
 }
 
 // 日记图片处理

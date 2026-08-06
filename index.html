@@ -272,6 +272,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
   </div>
 </div>
 
+<!-- 🎯 指定可见：选人弹窗 -->
+<div class="overlay" id="visiblePickerOverlay" onclick="if(event.target===this)closeVisiblePicker()">
+  <div class="setup-card" style="max-width:480px;">
+    <h2>🎯 仅指定的人可见</h2>
+    <p class="sub">选择谁可以看到这条碎碎念</p>
+    <label>搜索用户</label>
+    <input type="text" id="visiblePickerSearch" placeholder="输入昵称搜索…" maxlength="20" oninput="searchVisibleUsers()">
+    <div id="visiblePickerSelected" style="margin:10px 0;min-height:28px;"></div>
+    <div id="visiblePickerResults" style="max-height:240px;overflow-y:auto;margin-bottom:16px;"></div>
+    <button class="setup-btn" onclick="confirmVisiblePicker()">✅ 确定</button>
+  </div>
+</div>
+
 <!-- 个人设置弹窗（登录后） -->
 <div class="overlay" id="setupOverlay">
   <div class="setup-card">
@@ -564,6 +577,10 @@ let token = localStorage.getItem('suisui_token') || '';
 let user = (()=>{try{const r=localStorage.getItem('suisui_user');return r?JSON.parse(r):null}catch(e){return null}})();
 let isPrivate = false;
 let diaryIsPrivate = true;
+// ★★ 帖子可见性：public=公开 / private=仅自己 / custom=仅指定的人 ★★
+let postVisible = 'public';
+let postVisibleTo = [];        // 指定可见的用户ID数组
+let postVisibleToNames = [];   // 指定可见的用户名（用于显示）
 
 function saveAuth(){localStorage.setItem('suisui_token',token);localStorage.setItem('suisui_user',JSON.stringify(user||{}));}
 function closeAuth(){document.getElementById('authOverlay').classList.remove('show');}
@@ -844,6 +861,7 @@ async function loadPosts(){
         </div>`;
       })():''}
         ${p.visible==='private'&&isMe?'<div style="font-size:12px;color:#999;margin:4px 0 0;"><span style="background:#fff0f0;padding:2px 10px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;">🔒 仅自己可见</span></div>':''}
+        ${p.visible==='custom'?'<div style="font-size:12px;color:#999;margin:4px 0 0;"><span style="background:#f3edff;padding:2px 10px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;color:#6a3fd1;">🎯 '+(isMe?'仅指定的人可见':'指定可见')+'</span></div>':''}
         ${p.mood?`<div class="post-mood" style="background:${cl}22;color:${cl}">${p.mood}</div>`:''}
         <div class="post-actions">
           <span onclick="toggleComment(${p.id})">💬 <span>${p.comments?.length||0}</span></span>
@@ -878,10 +896,11 @@ async function addPost(){
   if(!text && !image && !audio) return toast('写点什么、传张图或录段语音吧～');
   const mood=document.getElementById('moodSelect').value;
   const btn=document.getElementById('postBtn');btn.disabled=true;
-  await fetch('/api/posts',{method:'POST',headers:authHeaders(),body:JSON.stringify({text,mood,visible:isPrivate?'private':'public',image,audio})});
+  await fetch('/api/posts',{method:'POST',headers:authHeaders(),body:JSON.stringify({text,mood,visible:postVisible,visible_to:postVisibleTo,image,audio})});
   input.value='';document.getElementById('moodSelect').value='';btn.disabled=false;
   clearPostImage();clearAudio();
-  if(isPrivate){isPrivate=false;document.getElementById('visibleToggle').textContent='🌍 公开';document.getElementById('visibleToggle').style.borderColor='#e0e0e0';document.getElementById('visibleToggle').style.background='#fafafa';}
+  // 发帖后重置可见性
+  postVisible='public';postVisibleTo=[];postVisibleToNames=[];updateVisibleToggle();
   loadPosts();toast('发布成功 ♡');
 }
 
@@ -900,11 +919,92 @@ async function deletePost(id){
 }
 
 function toggleVisible(){
-  isPrivate=!isPrivate;
-  document.getElementById('visibleToggle').textContent=isPrivate?'🔒 私密':'🌍 公开';
-  document.getElementById('visibleToggle').style.borderColor=isPrivate?'#ff4444':'#e0e0e0';
-  document.getElementById('visibleToggle').style.background=isPrivate?'#fff5f5':'#fafafa';
-  toast(isPrivate?'已设为仅自己可见 🔒':'已设为公开 🌍');
+  // 循环：公开 → 仅自己 → 仅指定的人 → 公开
+  if(postVisible==='public'){
+    postVisible='private';
+  }else if(postVisible==='private'){
+    postVisible='custom';
+    // 切到"仅指定的人"时弹出选择器
+    openVisiblePicker();
+    return;
+  }else{
+    postVisible='public';
+    postVisibleTo=[];postVisibleToNames=[];
+  }
+  updateVisibleToggle();
+  const msg=postVisible==='public'?'已设为公开 🌍':postVisible==='private'?'已设为仅自己可见 🔒':'';
+  if(msg)toast(msg);
+}
+
+function updateVisibleToggle(){
+  const el=document.getElementById('visibleToggle');
+  if(!el)return;
+  if(postVisible==='public'){
+    el.textContent='🌍 公开';
+    el.style.borderColor='#e0e0e0';el.style.background='#fafafa';
+  }else if(postVisible==='private'){
+    el.textContent='🔒 仅自己';
+    el.style.borderColor='#ff4444';el.style.background='#fff5f5';
+  }else{
+    const n=postVisibleToNames.length;
+    el.textContent='🎯 仅指定('+(n>0?n+'人':'选人')+')';
+    el.style.borderColor='#7C4DFF';el.style.background='#f3edff';
+  }
+}
+
+// ====== 指定可见：选人弹窗 ======
+let pickSelected=[]; // {id,name,avatar,color}
+async function openVisiblePicker(){
+  if(!token)return;
+  pickSelected=postVisibleTo.map((id,i)=>({id:id,name:postVisibleToNames[i]||('用户'+id),avatar:'🌸',color:'#7C4DFF'}));
+  renderPickList();
+  document.getElementById('visiblePickerOverlay').classList.add('show');
+  const q=document.getElementById('visiblePickerSearch').value='';
+  const list=document.getElementById('visiblePickerResults');
+  list.innerHTML='<div style="padding:16px;text-align:center;color:#999;font-size:13px;">输入昵称搜索用户～</div>';
+  setTimeout(()=>document.getElementById('visiblePickerSearch').focus(),100);
+}
+function closeVisiblePicker(){document.getElementById('visiblePickerOverlay').classList.remove('show');}
+async function searchVisibleUsers(){
+  const q=document.getElementById('visiblePickerSearch').value.trim();
+  const list=document.getElementById('visiblePickerResults');
+  if(!q){list.innerHTML='<div style="padding:16px;text-align:center;color:#999;font-size:13px;">输入昵称搜索用户～</div>';return;}
+  try{
+    const res=await fetch('/api/users/search?q='+encodeURIComponent(q),{headers:authHeaders()});
+    const users=await res.json();
+    if(!users.length){list.innerHTML='<div style="padding:16px;text-align:center;color:#999;font-size:13px;">没找到这个人哦～</div>';return;}
+    list.innerHTML=users.map(u=>{
+      const sel=pickSelected.find(x=>x.id===u.id);
+      return `<div onclick="pickUser(${u.id},'${(u.nickname||'').replace(/'/g,"\\'")}','${(u.avatar||'🌸').replace(/'/g,"\\'")}','${u.color||'#7C4DFF'}')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;cursor:pointer;margin-bottom:6px;${sel?'background:var(--primary-bg,#f3edff);':'background:#fafafa;'}">
+        <span class="mini-avatar" style="background:${u.color||'#7C4DFF'}">${avatarHtml(u.avatar||'🌸')}</span>
+        <span style="flex:1;font-size:14px;color:#444;">${u.nickname||u.username||('用户'+u.id)}</span>
+        <span style="font-size:16px;">${sel?'✅':'➕'}</span>
+      </div>`;
+    }).join('');
+  }catch(e){list.innerHTML='<div style="padding:16px;text-align:center;color:#e94560;font-size:13px;">搜索失败，请重试</div>';}
+}
+function pickUser(id,name,avatar,color){
+  const i=pickSelected.findIndex(x=>x.id===id);
+  if(i>=0){pickSelected.splice(i,1);}
+  else{pickSelected.push({id:id,name:name,avatar:avatar,color:color});}
+  // 重新渲染搜索结果的高亮 + 已选标签
+  searchVisibleUsers();
+  renderPickList();
+}
+function renderPickList(){
+  const box=document.getElementById('visiblePickerSelected');
+  if(!box)return;
+  if(!pickSelected.length){box.innerHTML='<span style="font-size:12px;color:#bbb;">还没有选择任何人～</span>';return;}
+  box.innerHTML=pickSelected.map(u=>`<span style="display:inline-flex;align-items:center;gap:4px;background:#f3edff;border:1px solid #d5c4ff;border-radius:14px;padding:4px 10px;font-size:12px;color:#6a3fd1;margin:3px;">${u.avatar} ${u.name}<span onclick="pickUser(${u.id},'${u.name.replace(/'/g,"\\'")}','${u.avatar.replace(/'/g,"\\'")}','${u.color}')" style="cursor:pointer;color:#999;margin-left:2px;">✕</span></span>`).join('');
+}
+function confirmVisiblePicker(){
+  if(!pickSelected.length){toast('请至少选择一个人哦～');return;}
+  postVisible='custom';
+  postVisibleTo=pickSelected.map(x=>x.id);
+  postVisibleToNames=pickSelected.map(x=>x.name);
+  updateVisibleToggle();
+  closeVisiblePicker();
+  toast('已设为仅指定的人可见 🎯');
 }
 
 function toggleDiaryVisible(){

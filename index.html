@@ -526,6 +526,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
     </details>
       </div>
     </div>
+    <div style="margin-top:20px;padding-top:16px;border-top:2px dashed #d0b0ff;">
+      <details id="adminBox">
+        <summary style="font-size:13px;font-weight:600;color:#7C4DFF;cursor:pointer;padding:4px 0;">👑 管理员</summary>
+        <div id="adminPromoteBox" style="margin-top:12px;">
+          <label style="font-size:12px;">管理员密钥</label>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <input type="password" id="adminSecretInput" placeholder="输入管理员密钥..." style="flex:1;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+            <button id="adminPromoteBtn" onclick="adminPromote()" style="border:none;border-radius:14px;padding:0 20px;font-size:14px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#7C4DFF,#B388FF);color:#fff;">升级</button>
+          </div>
+          <p id="adminPromoteMsg" style="font-size:11px;color:#999;margin-top:6px;"></p>
+        </div>
+        <div id="adminPanel" style="display:none;margin-top:14px;">
+          <div id="adminStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
+          <div style="margin-top:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:13px;font-weight:600;color:#333;">📝 帖子管理</label>
+              <button onclick="adminLoadPosts()" style="border:1px solid #e0d0ff;background:#fff;color:#7C4DFF;border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;">🔄 刷新</button>
+            </div>
+            <div id="adminPostList" style="max-height:260px;overflow-y:auto;border:1px solid #f0e6ff;border-radius:12px;padding:8px;background:#faf7ff;"></div>
+          </div>
+          <div style="margin-top:14px;">
+            <label style="font-size:13px;font-weight:600;color:#333;">👥 用户管理</label>
+            <div id="adminUserList" style="margin-top:6px;max-height:260px;overflow-y:auto;border:1px solid #f0e6ff;border-radius:12px;padding:8px;background:#faf7ff;"></div>
+          </div>
+        </div>
+      </details>
+    </div>
     <div style="margin-top:20px;padding-top:16px;border-top:2px dashed #ffd0d0;">
       <button id="cleanAllBtn" onclick="cleanAllData()" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:600;color:#e94560;cursor:pointer;background:#fff5f5;border:1px solid #ffd0d0;transition:all 0.2s;">🧹 一键清除所有帖子和日记</button>
       <p style="font-size:11px;color:#e94560;margin-top:6px;">⚠️ 此操作不可撤销，会清空你所有的内容</p>
@@ -614,7 +641,7 @@ async function doRegister(){
     const d=await res.json();
     if(d.error)return showError(errEl,d.error);
     // 注册成功自动登录
-    token=d.token;user={id:d.id,name:u,avatar:'🌸',color:'#7C4DFF'};saveAuth();
+    token=d.token;user={id:d.id,name:u,avatar:'🌸',color:'#7C4DFF',is_admin:d.is_admin||0};saveAuth();
     document.getElementById('authOverlay').classList.remove('show');updateUI();loadPosts();toast('注册成功！欢迎 '+u+' ♡');
   }catch(e){showError(errEl,'网络错误，请重试')}
 }
@@ -629,13 +656,123 @@ async function doLogin(){
     const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
     const d=await res.json();
     if(d.error)return showError(errEl,d.error);
-    token=d.token;user={id:d.id,name:d.username,avatar:user?.avatar||'🌸',color:user?.color||'#7C4DFF'};
+    token=d.token;user={id:d.id,name:d.username,is_admin:d.is_admin||0,avatar:user?.avatar||'🌸',color:user?.color||'#7C4DFF'};
     saveAuth();document.getElementById('authOverlay').classList.remove('show');updateUI();loadPosts();toast('欢迎回来，'+d.username+' 💜');
   }catch(e){showError(errEl,'网络错误，请重试')}
 }
 
 // 退出
 function doLogout(){if(!confirm('确定退出登录？'))return;clearAuth();document.getElementById('setupOverlay').classList.remove('show');document.getElementById('authOverlay').classList.add('show');location.reload()}
+
+// ====== 管理员 ======
+function initAdminUI(){
+  var panel=document.getElementById('adminPanel');
+  var promo=document.getElementById('adminPromoteBox');
+  var msg=document.getElementById('adminPromoteMsg');
+  if(panel)panel.style.display=(user&&user.is_admin)?'block':'none';
+  if(promo)promo.style.display=(user&&user.is_admin)?'none':'block';
+  if(msg)msg.textContent=user&&user.is_admin?'✅ 你已是管理员':'输入密钥即可升级为管理员';
+  if(user&&user.is_admin)adminRefresh();
+}
+async function adminPromote(){
+  var secret=document.getElementById('adminSecretInput').value.trim();
+  var msg=document.getElementById('adminPromoteMsg');
+  if(!secret){msg.textContent='请输入密钥';msg.style.color='#e94560';return;}
+  var btn=document.getElementById('adminPromoteBtn');
+  btn.disabled=true;btn.textContent='⏳';
+  try{
+    var res=await fetch('/api/admin/promote',{method:'POST',headers:authHeaders(),body:JSON.stringify({secret:secret})});
+    var d=await res.json();
+    if(d.ok){
+      user.is_admin=1;saveAuth();
+      msg.textContent='✅ 已升级为管理员！';msg.style.color='#2e7d32';
+      document.getElementById('adminPromoteBox').style.display='none';
+      document.getElementById('adminPanel').style.display='block';
+      adminRefresh();
+      toast('👑 欢迎回来，管理员');
+    }else{
+      msg.textContent='❌ '+d.error;msg.style.color='#e94560';
+    }
+  }catch(e){msg.textContent='❌ 网络错误';msg.style.color='#e94560';}
+  btn.disabled=false;btn.textContent='升级';
+}
+async function adminRefresh(){
+  if(!user||!user.is_admin)return;
+  await Promise.all([adminLoadStats(),adminLoadPosts(),adminLoadUsers()]);
+}
+async function adminLoadStats(){
+  try{
+    var res=await fetch('/api/admin/stats',{headers:authHeaders()});
+    var d=await res.json();
+    if(d.error)return;
+    var items=[['👥 用户',d.users],['💬 帖子',d.posts],['🗨️ 评论',d.comments],['📖 日记',d.diaries],['🤖 智能体',d.agents],['💞 好友关系',d.friends]];
+    document.getElementById('adminStats').innerHTML=items.map(function(pair){
+      return '<div style="background:#fff;border:1px solid #f0e6ff;border-radius:10px;padding:10px 6px;text-align:center;"><div style="font-size:11px;color:#999;">'+pair[0]+'</div><div style="font-size:18px;font-weight:700;color:#7C4DFF;margin-top:2px;">'+pair[1]+'</div></div>';
+    }).join('');
+  }catch(e){}
+}
+async function adminLoadPosts(){
+  try{
+    var res=await fetch('/api/admin/posts',{headers:authHeaders()});
+    var list=await res.json();
+    if(!Array.isArray(list))return;
+    var box=document.getElementById('adminPostList');
+    if(!list.length){box.innerHTML='<div style="color:#999;font-size:12px;padding:10px;text-align:center;">暂无帖子</div>';return;}
+    box.innerHTML=list.map(function(p){
+      var vis=p.visible||'public';
+      var visTxt=vis==='public'?'🌍 公开':vis==='private'?'🔒 仅自己':vis==='friends'?'💞 好友':'🎯 指定';
+      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px;border-bottom:1px dashed #f0e6ff;">'+
+        '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:11px;color:#7C4DFF;font-weight:600;">#'+p.id+' · '+(p.author||p.username||('用户'+p.user_id))+' <span style="color:#bbb;font-weight:400;">'+visTxt+'</span></div>'+
+        '<div style="font-size:12px;color:#555;margin-top:2px;word-break:break-all;max-height:36px;overflow:hidden;">'+escapeHtml(p.text||'')+'</div>'+
+        '<div style="font-size:10px;color:#bbb;margin-top:2px;">'+(p.time||'').substring(0,16)+'</div>'+
+        '</div>'+
+        '<button onclick="adminDeletePost('+p.id+')" style="flex-shrink:0;border:none;background:#fff0f0;color:#e94560;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;">删除</button>'+
+        '</div>';
+    }).join('');
+  }catch(e){}
+}
+async function adminDeletePost(pid){
+  if(!confirm('确定删除帖子 #'+pid+' ？'))return;
+  try{
+    var res=await fetch('/api/admin/posts/'+pid,{method:'DELETE',headers:authHeaders()});
+    var d=await res.json();
+    if(d.ok){toast('✅ 已删除帖子 #'+pid);adminLoadPosts();adminLoadStats();}
+    else toast('❌ '+d.error);
+  }catch(e){toast('❌ 网络错误');}
+}
+async function adminLoadUsers(){
+  try{
+    var res=await fetch('/api/admin/users',{headers:authHeaders()});
+    var list=await res.json();
+    if(!Array.isArray(list))return;
+    var box=document.getElementById('adminUserList');
+    box.innerHTML=list.map(function(u){
+      var isMe=user&&u.id===user.id;
+      var badge=u.is_admin?'<span style="font-size:10px;background:#7C4DFF;color:#fff;border-radius:6px;padding:1px 6px;margin-left:4px;">👑管理员</span>':'';
+      var meTag=isMe?'<span style="font-size:10px;color:#999;margin-left:4px;">(我)</span>':'';
+      var delBtn=isMe?'':'<button onclick="adminDeleteUser('+u.id+')" style="flex-shrink:0;border:none;background:#fff0f0;color:#e94560;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;">删除</button>';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px dashed #f0e6ff;">'+
+        '<div style="width:28px;height:28px;border-radius:50%;background:'+(u.color||'#7C4DFF')+';display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">'+(u.avatar||'🌸')+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:12px;font-weight:600;color:#333;">'+escapeHtml(u.nickname||u.username)+badge+meTag+'</div>'+
+        '<div style="font-size:10px;color:#999;">ID:'+u.id+' · 帖子 '+(u.post_count||0)+' · 日记 '+(u.diary_count||0)+'</div>'+
+        '</div>'+delBtn+'</div>';
+    }).join('');
+  }catch(e){}
+}
+async function adminDeleteUser(uid){
+  if(!confirm('⚠️ 确定删除用户 #'+uid+' ？\n该用户的所有内容将一并删除！'))return;
+  try{
+    var res=await fetch('/api/admin/users/'+uid,{method:'DELETE',headers:authHeaders()});
+    var d=await res.json();
+    if(d.ok){toast('✅ 已删除用户 #'+uid);adminLoadUsers();adminLoadStats();}
+    else toast('❌ '+d.error);
+  }catch(e){toast('❌ 网络错误');}
+}
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'"',"'":'&#39;'}[c];});
+}
 
 // 一键清除所有内容
 async function cleanAllData(){
@@ -754,6 +891,7 @@ function initSettingsPage(){
   document.getElementById('settingsColorGrid').innerHTML=COLORS.map(c=>`<div class="color-opt${c===cur.color?' selected':''}" data-color="${c}" style="background:${c}" onclick="pickSettingsColor(this)"></div>`).join('');
   document.getElementById('settingsDsKey').value=cur.api_key||'';
   document.getElementById('settingsDsUrl').value=cur.api_base_url||'';
+  initAdminUI();
 }
 
 function pickSettingsAvatar(el){

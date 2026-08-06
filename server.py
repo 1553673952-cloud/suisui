@@ -71,6 +71,7 @@ def init_db():
                 avatar VARCHAR(50) DEFAULT '🌸',
                 color VARCHAR(20) DEFAULT '#7C4DFF',
                 theme TEXT DEFAULT '{}',
+                is_admin INTEGER DEFAULT 0,
                 token VARCHAR(64) UNIQUE,
                 created_at TIMESTAMP DEFAULT NOW()
             )
@@ -206,6 +207,12 @@ def init_db():
             print('  ✅ users.theme 字段已添加')
         except Exception:
             pass
+        # ★★ migration: 添加 is_admin 字段 ★★
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0")
+            print('  ✅ users.is_admin 字段已添加')
+        except Exception:
+            pass
         print('✅ 数据库表初始化完成')
     except Exception as e:
         print(f'⚠️ 数据库建表失败（{e}），可能权限不足')
@@ -233,7 +240,7 @@ def get_current_user():
             conn = get_conn()
             try:
                 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-                cur.execute('SELECT id, username, nickname, avatar, color, theme, api_key, api_base_url FROM users WHERE token = %s', (token,))
+                cur.execute('SELECT id, username, nickname, avatar, color, theme, is_admin, api_key, api_base_url FROM users WHERE token = %s', (token,))
                 return cur.fetchone()
             finally:
                 conn.close()
@@ -271,7 +278,7 @@ def register():
         return jsonify({
             'id': user['id'], 'username': username,
             'nickname': user['nickname'], 'avatar': user['avatar'],
-            'color': user['color'], 'token': token
+            'color': user['color'], 'token': token, 'is_admin': 0
         })
     finally:
         conn.close()
@@ -287,7 +294,7 @@ def login():
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-        cur.execute('SELECT id, username, nickname, avatar, color, token FROM users WHERE username = %s AND password = %s', (username, pwd_hash))
+        cur.execute('SELECT id, username, nickname, avatar, color, token, is_admin FROM users WHERE username = %s AND password = %s', (username, pwd_hash))
         user = cur.fetchone()
         if not user:
             return jsonify({'error': '用户名或密码错误'}), 401
@@ -970,6 +977,127 @@ def get_private_messages(other_id):
 def ping():
     """轻量心跳检测"""
     return jsonify({'pong': True, 'time': str(datetime.now(CN_TZ))})
+
+# ===== 管理员系统 =====
+ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'sui-admin-k3y-9f2k-5p8m')
+
+def require_admin():
+    """检查当前用户是否为管理员"""
+    user = get_current_user()
+    if not user or not user.get('is_admin'):
+        return None
+    return user
+
+@app.route('/api/admin/promote', methods=['POST'])
+def admin_promote():
+    """用管理员密钥把当前登录用户升级为管理员"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    body = request.get_json(silent=True) or {}
+    secret = body.get('secret', '')
+    if secret != ADMIN_SECRET:
+        return jsonify({'error': '密钥错误'}), 403
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET is_admin = 1 WHERE id = %s', (user['id'],))
+        conn.commit()
+        return jsonify({'ok': True, 'is_admin': 1})
+    finally:
+        conn.close()
+
+@app.route('/api/admin/stats', methods=['GET'])
+def admin_stats():
+    if not require_admin():
+        return jsonify({'error': '无权限'}), 403
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        def cnt(sql):
+            cur.execute(sql)
+            return cur.fetchone()[0]
+        return jsonify({
+            'users': cnt('SELECT COUNT(*) FROM users'),
+            'posts': cnt('SELECT COUNT(*) FROM posts'),
+            'comments': cnt('SELECT COUNT(*) FROM comments'),
+            'diaries': cnt('SELECT COUNT(*) FROM diaries'),
+            'agents': cnt('SELECT COUNT(*) FROM agents'),
+            'friends': cnt('SELECT COUNT(*) FROM friends')
+        })
+    finally:
+        conn.close()
+
+@app.route('/api/admin/posts', methods=['GET'])
+def admin_posts():
+    if not require_admin():
+        return jsonify({'error': '无权限'}), 403
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT p.id, p.user_id, p.text, p.mood, p.time, p.visible, p.visible_to, p.created_at,
+                   u.nickname AS author, u.username AS username
+            FROM posts p JOIN users u ON p.user_id = u.id
+            ORDER BY p.id DESC LIMIT 200
+        """)
+        posts = []
+        for r in cur.fetchall():
+            d = dict(r)
+            try:
+                d['visible_to'] = [int(x) for x in (d.get('visible_to') or '').split(',') if x.strip().isdigit()]
+            except Exception:
+                d['visible_to'] = []
+            posts.append(d)
+        return jsonify(posts)
+    finally:
+        conn.close()
+
+@app.route('/api/admin/posts/<int:pid>', methods=['DELETE'])
+def admin_delete_post(pid):
+    if not require_admin():
+        return jsonify({'error': '无权限'}), 403
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM posts WHERE id = %s', (pid,))
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        conn.close()
+
+@app.route('/api/admin/users', methods=['GET'])
+def admin_users():
+    if not require_admin():
+        return jsonify({'error': '无权限'}), 403
+    conn = get_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT u.id, u.username, u.nickname, u.avatar, u.color, u.is_admin, u.created_at,
+                   (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS post_count,
+                   (SELECT COUNT(*) FROM diaries d WHERE d.user_id = u.id) AS diary_count
+            FROM users u ORDER BY u.id
+        """)
+        return jsonify([dict(r) for r in cur.fetchall()])
+    finally:
+        conn.close()
+
+@app.route('/api/admin/users/<int:uid>', methods=['DELETE'])
+def admin_delete_user(uid):
+    admin = require_admin()
+    if not admin:
+        return jsonify({'error': '无权限'}), 403
+    if uid == admin['id']:
+        return jsonify({'error': '不能删除自己'}), 400
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM users WHERE id = %s', (uid,))
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8792))

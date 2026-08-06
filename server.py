@@ -83,6 +83,7 @@ def init_db():
                 mood VARCHAR(50) DEFAULT '',
                 time VARCHAR(20) DEFAULT '',
                 visible VARCHAR(20) DEFAULT 'public',
+                visible_to TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -118,6 +119,12 @@ def init_db():
         # 语音支持迁移
         try:
             cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS audio TEXT DEFAULT ''")
+        except Exception:
+            pass
+        # ★★ 仅指定人可见支持（老表加列）★★
+        try:
+            cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS visible_to TEXT DEFAULT ''")
+            print('  ✅ posts.visible_to 已添加')
         except Exception:
             pass
         # 日记公开/私密支持
@@ -328,16 +335,29 @@ def get_posts():
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         if user:
+            # 获取好友ID列表（用于friends可见性）
             cur.execute("""
-                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image, p.audio,
+                SELECT friend_id FROM friends WHERE user_id = %s AND status = 'accepted'
+                UNION SELECT user_id FROM friends WHERE friend_id = %s AND status = 'accepted'
+            """, (user['id'], user['id']))
+            friend_ids = [r['friend_id'] for r in cur.fetchall()]
+            sql = """
+                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image, p.audio, p.visible_to,
                        u.nickname AS author, u.avatar, u.color
                 FROM posts p JOIN users u ON p.user_id = u.id
-                WHERE p.visible = 'public' OR p.user_id = %s
-                ORDER BY p.id DESC
-            """, (user['id'],))
+                WHERE p.visible = 'public'
+                   OR (p.visible = 'private' AND p.user_id = %s)
+                   OR (p.visible = 'custom' AND (p.user_id = %s OR %s = ANY(string_to_array(p.visible_to, ',')::int[])))
+            """
+            params = [user['id'], user['id'], user['id']]
+            if friend_ids:
+                sql += " OR (p.visible = 'friends' AND p.user_id = ANY(%s::int[]))"
+                params.append(friend_ids)
+            sql += " ORDER BY p.id DESC"
+            cur.execute(sql, tuple(params))
         else:
             cur.execute("""
-                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image, p.audio,
+                SELECT p.id, p.text, p.mood, p.time, p.visible, p.image, p.audio, p.visible_to,
                        u.nickname AS author, u.avatar, u.color
                 FROM posts p JOIN users u ON p.user_id = u.id
                 WHERE p.visible = 'public'
@@ -346,6 +366,11 @@ def get_posts():
         posts = []
         for row in cur.fetchall():
             post = dict(row)
+            # visible_to 字符串转数组返回给前端
+            try:
+                post['visible_to'] = [int(x) for x in (post.get('visible_to') or '').split(',') if x.strip().isdigit()]
+            except Exception:
+                post['visible_to'] = []
             c2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             c2.execute("""
                 SELECT c.text, c.time, u.nickname AS name, u.avatar, u.color
@@ -365,14 +390,20 @@ def add_post():
     if not user:
         return jsonify({'error': '请先登录'}), 401
     body = request.get_json(silent=True) or {}
+    # visible_to 支持数组或逗号分隔字符串
+    visible_to = body.get('visible_to', '')
+    if isinstance(visible_to, list):
+        visible_to = ','.join(str(x) for x in visible_to if str(x).isdigit())
+    else:
+        visible_to = ','.join(x.strip() for x in str(visible_to).split(',') if x.strip().isdigit())
     conn = get_conn()
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "INSERT INTO posts (user_id, text, mood, time, visible, image, audio) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            "INSERT INTO posts (user_id, text, mood, time, visible, image, audio, visible_to) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (user['id'], body.get('text', ''), body.get('mood', ''),
              datetime.now(CN_TZ).strftime('%m-%d %H:%M'), body.get('visible', 'public'),
-             body.get('image', ''), body.get('audio', ''))
+             body.get('image', ''), body.get('audio', ''), visible_to)
         )
         post_id = cur.fetchone()['id']
         conn.commit()
@@ -380,6 +411,7 @@ def add_post():
             'id': post_id, 'text': body.get('text', ''), 'mood': body.get('mood', ''),
             'time': datetime.now(CN_TZ).strftime('%m-%d %H:%M'),
             'visible': body.get('visible', 'public'),
+            'visible_to': [int(x) for x in visible_to.split(',') if x],
             'image': body.get('image', ''),
             'audio': body.get('audio', ''),
             'author': user['nickname'], 'avatar': user['avatar'],

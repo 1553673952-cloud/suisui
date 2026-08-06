@@ -163,6 +163,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 .friend-chat-view .chat-msg.user{flex-direction:column;align-items:flex-end;justify-content:flex-start;}
 .friend-chat-view .chat-msg .msg-time{font-size:10px;color:#bbb;margin-top:2px;}
 .friend-chat-view .chat-msg.user .msg-time{text-align:right;}
+.friend-chat-view.fullscreen{max-width:100%;height:100vh;bottom:0;z-index:300;}
+.fullscreen-btn{margin-left:auto;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:8px;transition:background 0.2s;}
 .request-actions{display:flex;gap:8px;margin-left:auto;}
 /* loading动画 */
 .loading-dots{display:flex;align-items:center;justify-content:center;gap:6px;padding:30px 0;}
@@ -580,6 +582,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
   <div class="chat-header">
     <span class="back" onclick="closeFriendChat()">←</span>
     <span class="chat-name" id="friendChatName"></span>
+    <span class="fullscreen-btn" onclick="toggleFriendChatFullscreen()" title="全屏">⛶</span>
   </div>
   <div class="chat-messages" id="friendChatMessages"></div>
   <div class="chat-input-area">
@@ -1742,6 +1745,10 @@ function openFriendChat(friendId,name){
   },4000);
 }
 
+function toggleFriendChatFullscreen(){
+  var box=document.getElementById('friendChatView');
+  box.classList.toggle('fullscreen');
+}
 function closeFriendChat(){
   currentFriendId=null;
   clearInterval(friendPollTimer);

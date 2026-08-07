@@ -327,7 +327,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
       </label>
       <span class="record-btn" id="recordBtn" title="录音" onclick="toggleRecord()" style="cursor:pointer;font-size:16px;padding:4px 10px;border-radius:14px;border:1px dashed var(--border2);background:#fafafa;user-select:none;transition:all 0.2s;">🎤</span>
       <span id="audioPreview" style="display:none;font-size:12px;color:#666;align-items:center;gap:4px;">🎵 <span id="audioName">语音</span><span onclick="clearAudio()" style="cursor:pointer;color:#e94560;margin-left:4px;">✕</span></span>
-      <select class="mood-select" id="moodSelect">
+      <select class="mood-select" id="moodSelect" onchange="toggleCustomMood(this, 'customMoodInput')">
         <option value="">💜 心情标签</option>
         <option value="😊 开心">😊 开心</option>
         <option value="💕 想你">💕 想你</option>
@@ -347,7 +347,9 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
         <option value="🥺 委屈">🥺 委屈</option>
         <option value="💔 心碎">💔 心碎</option>
         <option value="😤 吃醋">😤 吃醋</option>
+        <option value="✏️ 自定义">✏️ 自定义</option>
       </select>
+      <input type="text" id="customMoodInput" placeholder="输入心情…" maxlength="20" style="display:none;width:110px;border:2px dashed var(--border2);border-radius:18px;padding:6px 12px;font-size:13px;outline:none;font-family:inherit;box-sizing:border-box;background:#fafafa;">
       <span id="visibleToggle" onclick="toggleVisible()" style="cursor:pointer;font-size:14px;padding:4px 10px;border-radius:14px;border:1px dashed var(--border2);background:#fafafa;user-select:none;transition:all 0.2s;" title="点击切换可见性">🌍 公开</span>
     </div>
     <button class="btn" id="postBtn" style="background:linear-gradient(135deg,var(--primary),var(--primary-light))" onclick="addPost()">发 布</button>
@@ -372,7 +374,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
         <input type="file" id="diaryImageInput" accept="image/*" onchange="handleDiaryImage(this)" style="display:none">
         🖼️
       </label>
-      <select class="mood-select" id="diaryMood">
+      <select class="mood-select" id="diaryMood" onchange="toggleCustomMood(this, 'diaryCustomMood')">
         <option value="">💜 心情</option>
         <option value="😊 开心">😊 开心</option>
         <option value="💕 想你">💕 想你</option>
@@ -392,7 +394,9 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
         <option value="🥺 委屈">🥺 委屈</option>
         <option value="💔 心碎">💔 心碎</option>
         <option value="😤 吃醋">😤 吃醋</option>
+        <option value="✏️ 自定义">✏️ 自定义</option>
       </select>
+      <input type="text" id="diaryCustomMood" placeholder="输入心情…" maxlength="20" style="display:none;width:110px;border:2px dashed var(--border2);border-radius:18px;padding:6px 12px;font-size:13px;outline:none;font-family:inherit;box-sizing:border-box;background:#fafafa;">
       <span id="diaryVisibleToggle" onclick="toggleDiaryVisible()" style="cursor:pointer;font-size:14px;padding:4px 10px;border-radius:14px;border:1px dashed var(--border2);background:#fafafa;user-select:none;transition:all 0.2s;" title="点击切换可见性">🔒 私密</span>
       <button class="btn" style="background:linear-gradient(135deg,var(--primary),var(--primary-light))" onclick="saveDiary()">📝 保存</button>
     </div>
@@ -1040,7 +1044,7 @@ async function addPost(){
   const rawAudio=window.pendingAudio||'';
   const audio=rawAudio?JSON.stringify({url:rawAudio,dur:window.pendingAudioDuration||1}):'';
   if(!text && !image && !audio) return toast('写点什么、传张图或录段语音吧～');
-  const mood=document.getElementById('moodSelect').value;
+  const mood=getMoodValue('moodSelect','customMoodInput');
   const btn=document.getElementById('postBtn');btn.disabled=true;
   await fetch('/api/posts',{method:'POST',headers:authHeaders(),body:JSON.stringify({text,mood,visible:postVisible,visible_to:postVisibleTo,image,audio})});
   input.value='';document.getElementById('moodSelect').value='';btn.disabled=false;
@@ -1080,6 +1084,27 @@ function toggleVisible(){
   updateVisibleToggle();
   const msg=postVisible==='public'?'已设为公开 🌍':postVisible==='private'?'已设为仅自己可见 🔒':'';
   if(msg)toast(msg);
+}
+
+function toggleCustomMood(selectEl, inputId){
+  var input = document.getElementById(inputId);
+  if(!input) return;
+  if(selectEl.value === '✏️ 自定义'){
+    input.style.display = '';
+    input.focus();
+  }else{
+    input.style.display = 'none';
+    input.value = '';
+  }
+}
+
+function getMoodValue(selectId, inputId){
+  var sel = document.getElementById(selectId);
+  var input = document.getElementById(inputId);
+  if(sel.value === '✏️ 自定义' && input && input.value.trim()){
+    return input.value.trim();
+  }
+  return sel.value;
 }
 
 function updateVisibleToggle(){
@@ -1330,7 +1355,7 @@ async function saveDiary(){
   var c=document.getElementById('diaryContent').value.trim();
   if(!c) return toast('写点内容吧～');
   var d=document.getElementById('diaryDate').value;
-  var m=document.getElementById('diaryMood').value;
+  var m=getMoodValue('diaryMood','diaryCustomMood');
   var image=window.pendingDiaryImage||'';
   await fetch('/api/diaries',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:t,content:c,date:d,mood:m,image,visible:diaryIsPrivate?'private':'public'})});
   document.getElementById('diaryTitle').value='';

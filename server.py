@@ -177,6 +177,15 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS post_likes (
+                id SERIAL PRIMARY KEY,
+                post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(post_id, user_id)
+            )
+        """)
         # 索引
         for idx in [
             'idx_posts_user ON posts(user_id)',
@@ -190,7 +199,9 @@ def init_db():
             'idx_friends_friend ON friends(friend_id)',
             'idx_friends_status ON friends(status)',
             'idx_pm_from ON private_messages(from_user_id)',
-            'idx_pm_to ON private_messages(to_user_id)'
+            'idx_pm_to ON private_messages(to_user_id)',
+            'idx_post_likes_post ON post_likes(post_id)',
+            'idx_post_likes_user ON post_likes(user_id)'
         ]:
             cur.execute(f'CREATE INDEX IF NOT EXISTS {idx}')
         conn.commit()
@@ -386,6 +397,19 @@ def get_posts():
             """, (post['id'],))
             post['comments'] = [dict(r) for r in c2.fetchall()]
             c2.close()
+            # 点赞数
+            c3 = conn.cursor()
+            c3.execute("SELECT COUNT(*) FROM post_likes WHERE post_id = %s", (post['id'],))
+            post['likes'] = c3.fetchone()[0]
+            c3.close()
+            # 当前用户是否已点赞
+            if user:
+                c4 = conn.cursor()
+                c4.execute("SELECT 1 FROM post_likes WHERE post_id = %s AND user_id = %s", (post['id'], user['id']))
+                post['liked'] = c4.fetchone() is not None
+                c4.close()
+            else:
+                post['liked'] = False
             posts.append(post)
         return jsonify(posts)
     finally:
@@ -461,6 +485,25 @@ def delete_post(pid):
         cur.execute('DELETE FROM posts WHERE id = %s AND user_id = %s', (pid, user['id']))
         conn.commit()
         return jsonify({'ok': True})
+    finally:
+        conn.close()
+
+@app.route('/api/posts/<int:pid>/like', methods=['POST', 'DELETE'])
+def toggle_like(pid):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': '请先登录'}), 401
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        if request.method == 'POST':
+            cur.execute("INSERT INTO post_likes (post_id, user_id) VALUES (%s, %s) ON CONFLICT (post_id, user_id) DO NOTHING", (pid, user['id']))
+        else:
+            cur.execute("DELETE FROM post_likes WHERE post_id = %s AND user_id = %s", (pid, user['id']))
+        conn.commit()
+        cur.execute("SELECT COUNT(*) FROM post_likes WHERE post_id = %s", (pid,))
+        likes = cur.fetchone()[0]
+        return jsonify({'ok': True, 'likes': likes})
     finally:
         conn.close()
 

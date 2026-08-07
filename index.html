@@ -496,66 +496,19 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
             <div id="themeBgPreviewWrap" style="display:none;margin-top:8px;border-radius:12px;overflow:hidden;border:2px solid var(--border);height:100px;background-size:cover;background-position:center;"></div>
             <p style="font-size:11px;color:var(--text-light);margin-top:6px;">💡 图片会自动压缩后存进你的账号（换设备也在），选好后点「✨ 应用主题」生效</p>
           </div>
-        </div>
         <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
           <button type="button" id="themeApplyBtn" style="flex:1;border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;">✨ 应用主题</button>
           <button type="button" id="themeResetBtn" style="flex:1;border:1px solid var(--border);border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card-bg);color:var(--text-light);">↺ 重置默认</button>
         </div>
         <p style="font-size:11px;color:var(--text-light);margin-top:8px;">💡 修改后点击「应用主题」实时预览，关闭设置页自动保存</p>
-      </div>
+        </div>
     </details>
   </div>
 
-  <!-- 智能体配置 -->
-  <div class="settings-card">
-    <details>
-      <summary>🤖 DeepSeek API 配置</summary>
-      <p style="font-size:11px;color:var(--text-light);margin:8px 0;text-align:left;">设置后智能体将默认使用 DeepSeek 模型</p>
-      <label>API Key</label>
-      <input type="text" id="settingsDsKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
-      <label>Base URL</label>
-      <input type="text" id="settingsDsUrl" placeholder="https://api.deepseek.com" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
-    </details>
+  <div style="padding:12px;">
+    <button class="setup-btn" id="settingsSaveBtn">✨ 保存设置</button>
+    <button style="width:100%;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;color:#e94560;cursor:pointer;margin-top:10px;background:#fff5f5;border:1px solid #ffd0d0;" onclick="doLogout()">退出登录</button>
   </div>
-
-  <!-- 管理员 -->
-  <div class="settings-card">
-    <details id="adminBox">
-      <summary>👑 管理员</summary>
-        <div id="adminPromoteBox" style="margin-top:12px;">
-          <label style="font-size:12px;">管理员密钥</label>
-          <div style="display:flex;gap:8px;margin-top:6px;">
-            <input type="password" id="adminSecretInput" placeholder="输入管理员密钥..." style="flex:1;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
-            <button id="adminPromoteBtn" onclick="adminPromote()" style="border:none;border-radius:14px;padding:0 20px;font-size:14px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#7C4DFF,#B388FF);color:#fff;">升级</button>
-          </div>
-          <p id="adminPromoteMsg" style="font-size:11px;color:#999;margin-top:6px;"></p>
-        </div>
-        <div id="adminPanel" style="display:none;margin-top:14px;">
-          <div id="adminStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
-          <div style="margin-top:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <label style="font-size:13px;font-weight:600;color:#333;">📝 帖子管理</label>
-              <button onclick="adminLoadPosts()" style="border:1px solid #e0d0ff;background:#fff;color:#7C4DFF;border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;">🔄 刷新</button>
-            </div>
-            <div id="adminPostList" style="max-height:260px;overflow-y:auto;border:1px solid #f0e6ff;border-radius:12px;padding:8px;background:#faf7ff;"></div>
-          </div>
-          <div style="margin-top:14px;">
-            <label style="font-size:13px;font-weight:600;color:#333;">👥 用户管理</label>
-            <div id="adminUserList" style="margin-top:6px;max-height:260px;overflow-y:auto;border:1px solid #f0e6ff;border-radius:12px;padding:8px;background:#faf7ff;"></div>
-          </div>
-        </div>
-      </details>
-    </div>
-    <!-- 危险区 -->
-    <div class="settings-card" style="border:1px solid #ffd0d0;">
-      <button id="cleanAllBtn" onclick="cleanAllData()" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:600;color:#e94560;cursor:pointer;background:#fff5f5;transition:all 0.2s;">🧹 一键清除所有帖子和日记</button>
-      <p style="font-size:11px;color:#e94560;margin-top:6px;text-align:center;">⚠️ 此操作不可撤销，会清空你所有的内容</p>
-    </div>
-
-    <div style="padding:12px;">
-      <button class="setup-btn" id="settingsSaveBtn">✨ 保存设置</button>
-      <button style="width:100%;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;color:#e94560;cursor:pointer;margin-top:10px;background:#fff5f5;border:1px solid #ffd0d0;" onclick="doLogout()">退出登录</button>
-    </div>
 </div>
 
 <!-- 好友页面 -->

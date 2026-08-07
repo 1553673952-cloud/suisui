@@ -6,21 +6,21 @@
 <title>💭 碎碎念 · 我们的小窝</title>
 <style>
 :root {
-  --primary: #C9A8FF;
-  --primary-light: #E0CCFF;
-  --primary-dark: #A078E0;
-  --primary-bg: #F5EEFF;
-  --secondary: #FFB5C2;
-  --bg: #FDF8F5;
+  --primary: #FFD699;
+  --primary-light: #FFE8C2;
+  --primary-dark: #E8B86D;
+  --primary-bg: #FFF5E6;
+  --secondary: #FFC97A;
+  --bg: #FFFBF0;
   --card-bg: #fff;
-  --text: #4A4A4A;
-  --text-light: #B0A0A0;
-  --text-light2: #C0B0B0;
-  --border: #F0E4E4;
-  --border2: #E8D8D8;
-  --shadow: rgba(201,168,255,0.3);
-  --header-gradient: linear-gradient(135deg, var(--primary), var(--secondary));
-  --btn-gradient: linear-gradient(135deg, var(--primary), var(--primary-light));
+  --text: #5A4A3A;
+  --text-light: #C0A888;
+  --text-light2: #D0B898;
+  --border: #F5E6D0;
+  --border2: #EDE0C8;
+  --shadow: rgba(255,214,153,0.3);
+  --header-gradient: linear-gradient(135deg, #FFD699, #FFC97A);
+  --btn-gradient: linear-gradient(135deg, #FFD699, #FFE8C2);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);max-width:600px;margin:0 auto;padding-bottom:80px;}
@@ -552,7 +552,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 
 <script>
 const AVATARS = ['🌸','💜','🌟','🦋','🌙','🍀','🎀','🌈','💫','🧸','🌺','🐱','🦊','🐼','⭐','🌷'];
-const COLORS = ['#7C4DFF','#E94560','#FF6B9D','#4FC3F7','#FF9800','#66BB6A','#AB47BC','#26C6DA','#EF5350','#FFA726','#8D6E63','#78909C'];
+const COLORS = ['#FFD699','#FFC97A','#FFB88C','#FFD4A8','#FFE8C2','#F5D6A0','#E8C89A','#D4B896','#FFE0B2','#FFCC80','#FFAB91','#BCAAA4'];
 
 // 统一头像渲染：支持 emoji / 图片 URL / base64 data URL
 function avatarHtml(v){
@@ -1773,12 +1773,12 @@ setToday();
 
 // 默认主题
 const DEFAULT_THEME = {
-  primary: '#C9A8FF',
-  secondary: '#FFB5C2',
-  bg: '#FDF8F5',
+  primary: '#FFD699',
+  secondary: '#FFC97A',
+  bg: '#FFFBF0',
   card_bg: '#ffffff',
-  text: '#4A4A4A',
-  text_light: '#B0A0A0'
+  text: '#5A4A3A',
+  text_light: '#C0A888'
 };
 
 // 应用主题到CSS变量

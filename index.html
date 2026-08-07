@@ -6,19 +6,19 @@
 <title>💭 碎碎念 · 我们的小窝</title>
 <style>
 :root {
-  --primary: #7C4DFF;
-  --primary-light: #B388FF;
-  --primary-dark: #5C35CC;
-  --primary-bg: #f3e5f5;
-  --secondary: #E94560;
-  --bg: #f5f5f5;
+  --primary: #C9A8FF;
+  --primary-light: #E0CCFF;
+  --primary-dark: #A078E0;
+  --primary-bg: #F5EEFF;
+  --secondary: #FFB5C2;
+  --bg: #FDF8F5;
   --card-bg: #fff;
-  --text: #333;
-  --text-light: #999;
-  --text-light2: #aaa;
-  --border: #eee;
-  --border2: #e0e0e0;
-  --shadow: rgba(124,77,255,0.3);
+  --text: #4A4A4A;
+  --text-light: #B0A0A0;
+  --text-light2: #C0B0B0;
+  --border: #F0E4E4;
+  --border2: #E8D8D8;
+  --shadow: rgba(201,168,255,0.3);
   --header-gradient: linear-gradient(135deg, var(--primary), var(--secondary));
   --btn-gradient: linear-gradient(135deg, var(--primary), var(--primary-light));
 }
@@ -56,8 +56,8 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 .post-form{background:#fff;margin:12px;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);}
 .post-form textarea{width:100%;border:none;resize:none;font-size:15px;min-height:50px;outline:none;font-family:inherit;line-height:1.6;color:#333;padding:4px 0;}
 .post-form textarea::placeholder{color:#bbb;}
-.post-form .tools{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:10px;border-top:1px solid #f0f0f0;}
-.post-form .mood-select{border:1px solid #e0e0e0;border-radius:18px;padding:6px 14px;font-size:13px;outline:none;color:#666;background:#fafafa;}
+.post-form .tools{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:10px;border-top:1px dashed #E8D8D8;}
+.post-form .mood-select{border:1px dashed #E8D8D8;border-radius:18px;padding:6px 14px;font-size:13px;outline:none;color:#666;background:#fafafa;}
 .post-form .btn{border:none;border-radius:20px;padding:9px 28px;font-size:14px;cursor:pointer;transition:opacity 0.2s;color:#fff;}
 .post-form .btn:disabled{opacity:0.5;}
 .post-form .btn:active{opacity:0.8;}
@@ -69,18 +69,18 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 .post .post-time{font-size:12px;color:#aaa;}
 .post .post-text{font-size:15px;line-height:1.7;margin-bottom:8px;white-space:pre-wrap;word-break:break-word;}
 .post .post-mood{display:inline-block;font-size:12px;padding:2px 10px;border-radius:12px;margin-bottom:6px;}
-.post .post-actions{display:flex;gap:24px;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;font-size:13px;color:#999;}
+.post .post-actions{display:flex;gap:24px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border2);font-size:13px;color:#999;}
 .post .post-actions span{cursor:pointer;display:flex;align-items:center;gap:4px;}
 .post .post-actions span:hover{color:var(--primary);}
 .post .post-actions .delete{color:#bbb;margin-left:auto;}
 .post .post-actions .delete:hover{color:#ff4444;}
-.comments{margin-top:10px;padding:10px 0 0;border-top:1px solid #f0f0f0;}
+.comments{margin-top:10px;padding:10px 0 0;border-top:1px dashed var(--border2);}
 .comment{font-size:14px;padding:6px 0;color:#555;line-height:1.5;}
 .comment .comment-author{font-weight:600;margin-right:6px;display:inline-flex;align-items:center;gap:4px;}
 .comment .cmt-avatar{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;overflow:hidden;flex-shrink:0;}
 .comment .comment-time{font-size:11px;color:#ccc;margin-left:6px;}
 .comment-form{display:flex;gap:8px;margin-top:8px;align-items:center;}
-.comment-form input{flex:1;border:1px solid #e0e0e0;border-radius:18px;padding:8px 14px;font-size:13px;outline:none;transition:border 0.2s;}
+.comment-form input{flex:1;border:1px dashed #E8D8D8;border-radius:18px;padding:8px 14px;font-size:13px;outline:none;transition:border 0.2s;}
 .comment-form input:focus{border-color:var(--primary);}
 .comment-form button{background:none;border:none;font-size:13px;font-weight:600;cursor:pointer;padding:6px 10px;}
 .comment-form button:active{opacity:0.6;}
@@ -94,14 +94,14 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 .nav-tabs .tab.active{color:var(--primary);background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.1);}
 .page{display:none}.page.active{display:block}
 .diary-form{background:#fff;margin:12px;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
-.diary-form input,.diary-form textarea{width:100%;border:2px solid #eee;border-radius:12px;padding:10px 14px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;margin-bottom:8px;}
+.diary-form input,.diary-form textarea{width:100%;border:2px dashed var(--border2);border-radius:12px;padding:10px 14px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;margin-bottom:8px;}
 .diary-form textarea{min-height:120px;resize:vertical;}
 .diary-card{background:#fff;margin:12px;border-radius:14px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
 .diary-card .diary-date{font-size:12px;color:#999;}
 .diary-card .diary-title{font-size:16px;font-weight:600;margin:4px 0 8px;}
 .diary-card .diary-content{font-size:14px;line-height:1.7;color:#555;white-space:pre-wrap;}
 .diary-card .diary-mood{display:inline-block;font-size:12px;padding:2px 10px;border-radius:12px;}
-.diary-card .diary-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:10px;padding-top:8px;border-top:1px solid #f0f0f0;}
+.diary-card .diary-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border2);}
 .diary-card .diary-actions span{cursor:pointer;color:#999;}
 .diary-card .diary-actions span:hover{color:#ff4444;}
 .image-preview{position:relative;display:inline-block;margin:8px 0;border-radius:10px;overflow:hidden;max-width:100%;}
@@ -126,8 +126,8 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 .chat-msg .msg-bubble{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;}
 .chat-msg.agent .msg-bubble{background:#f0f0ff;border-bottom-left-radius:4px;}
 .chat-msg.user .msg-bubble{background:var(--primary);color:#fff;border-bottom-right-radius:4px;}
-.chat-input-area{display:flex;gap:8px;padding:10px 16px;background:#fff;border-top:1px solid #f0f0f0;}
-.chat-input-area input{flex:1;border:2px solid #eee;border-radius:20px;padding:10px 16px;font-size:14px;outline:none;}
+.chat-input-area{display:flex;gap:8px;padding:10px 16px;background:#fff;border-top:1px dashed var(--border2);}
+.chat-input-area input{flex:1;border:2px dashed var(--border2);border-radius:20px;padding:10px 16px;font-size:14px;outline:none;}
 .chat-input-area button{border:none;border-radius:20px;padding:10px 20px;font-size:14px;cursor:pointer;color:#fff;background:linear-gradient(135deg,var(--primary),var(--primary-light));height:44px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;}
 .add-agent-btn{display:block;margin:12px;padding:12px;border:2px dashed #ddd;border-radius:14px;color:#999;font-size:14px;cursor:pointer;text-align:center;}
 .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;}
@@ -135,7 +135,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 .modal-card{background:#fff;border-radius:20px;padding:24px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto;}
 .modal-card h3{font-size:18px;}
 .modal-card label{display:block;text-align:left;font-size:13px;font-weight:600;color:#666;margin-bottom:4px;margin-top:12px;}
-.modal-card input,.modal-card textarea{width:100%;border:2px solid #eee;border-radius:12px;padding:10px 14px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;}
+.modal-card input,.modal-card textarea{width:100%;border:2px dashed var(--border2);border-radius:12px;padding:10px 14px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;}
 .modal-card textarea{min-height:80px;}
 .modal-card .modal-actions{display:flex;gap:12px;margin-top:16px;}
 .modal-card .modal-actions button{flex:1;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;}
@@ -143,9 +143,9 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 .modal-card .btn-confirm{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;}
 .empty-state{text-align:center;color:#ccc;padding:60px 20px;}
 .friend-search{margin:12px;background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
-.friend-search input{width:100%;border:2px solid #eee;border-radius:12px;padding:10px 14px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;}
+.friend-search input{width:100%;border:2px dashed var(--border2);border-radius:12px;padding:10px 14px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;}
 .friend-search input:focus{border-color:var(--primary);}
-.search-result-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5;}
+.search-result-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border2);}
 .search-result-item:last-child{border-bottom:none;}
 .search-result-item .mini-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:600;flex-shrink:0;}
 .search-result-item .name{flex:1;font-size:14px;font-weight:600;}
@@ -309,7 +309,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
 </div>
 
 <div id="page-murmur" class="page active">
-<div id="guestBanner" style="display:none;padding:12px 16px;margin-bottom:12px;background:var(--card-bg,#fff);border-radius:14px;border:1px solid #f0f0f0;text-align:center;font-size:13px;color:var(--text-light,#999);">
+<div id="guestBanner" style="display:none;padding:12px 16px;margin-bottom:12px;background:var(--card-bg,#fff);border-radius:14px;border:1px dashed var(--border2);text-align:center;font-size:13px;color:var(--text-light,#999);">
   💭 登录后即可记录你的碎碎念 ✨
   <button onclick="document.getElementById('authOverlay').classList.add('show')" style="border:none;border-radius:10px;padding:6px 18px;font-size:12px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;margin-left:8px;vertical-align:middle;">🔑 登录</button>
 </div>
@@ -325,7 +325,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
         <input type="file" id="postImageInput" accept="image/*" onchange="handlePostImage(this)" style="display:none">
         🖼️
       </label>
-      <span class="record-btn" id="recordBtn" title="录音" onclick="toggleRecord()" style="cursor:pointer;font-size:16px;padding:4px 10px;border-radius:14px;border:1px solid #e0e0e0;background:#fafafa;user-select:none;transition:all 0.2s;">🎤</span>
+      <span class="record-btn" id="recordBtn" title="录音" onclick="toggleRecord()" style="cursor:pointer;font-size:16px;padding:4px 10px;border-radius:14px;border:1px dashed var(--border2);background:#fafafa;user-select:none;transition:all 0.2s;">🎤</span>
       <span id="audioPreview" style="display:none;font-size:12px;color:#666;align-items:center;gap:4px;">🎵 <span id="audioName">语音</span><span onclick="clearAudio()" style="cursor:pointer;color:#e94560;margin-left:4px;">✕</span></span>
       <select class="mood-select" id="moodSelect">
         <option value="">💜 心情标签</option>
@@ -348,7 +348,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
         <option value="💔 心碎">💔 心碎</option>
         <option value="😤 吃醋">😤 吃醋</option>
       </select>
-      <span id="visibleToggle" onclick="toggleVisible()" style="cursor:pointer;font-size:14px;padding:4px 10px;border-radius:14px;border:1px solid #e0e0e0;background:#fafafa;user-select:none;transition:all 0.2s;" title="点击切换可见性">🌍 公开</span>
+      <span id="visibleToggle" onclick="toggleVisible()" style="cursor:pointer;font-size:14px;padding:4px 10px;border-radius:14px;border:1px dashed var(--border2);background:#fafafa;user-select:none;transition:all 0.2s;" title="点击切换可见性">🌍 公开</span>
     </div>
     <button class="btn" id="postBtn" style="background:linear-gradient(135deg,var(--primary),var(--primary-light))" onclick="addPost()">发 布</button>
   </div>
@@ -393,7 +393,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
         <option value="💔 心碎">💔 心碎</option>
         <option value="😤 吃醋">😤 吃醋</option>
       </select>
-      <span id="diaryVisibleToggle" onclick="toggleDiaryVisible()" style="cursor:pointer;font-size:14px;padding:4px 10px;border-radius:14px;border:1px solid #e0e0e0;background:#fafafa;user-select:none;transition:all 0.2s;" title="点击切换可见性">🔒 私密</span>
+      <span id="diaryVisibleToggle" onclick="toggleDiaryVisible()" style="cursor:pointer;font-size:14px;padding:4px 10px;border-radius:14px;border:1px dashed var(--border2);background:#fafafa;user-select:none;transition:all 0.2s;" title="点击切换可见性">🔒 私密</span>
       <button class="btn" style="background:linear-gradient(135deg,var(--primary),var(--primary-light))" onclick="saveDiary()">📝 保存</button>
     </div>
   </div>
@@ -449,7 +449,7 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
       <div style="font-size:18px;font-weight:600;color:var(--text);" id="settingsName"></div>
     </div>
         <label>你的昵称</label>
-        <input type="text" id="settingsNickInput" placeholder="输入昵称..." maxlength="12" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+        <input type="text" id="settingsNickInput" placeholder="输入昵称..." maxlength="12" style="width:100%;border:2px dashed var(--border2);border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
     <label style="margin-top:16px;">选个头像</label>
     <div class="avatar-grid" id="settingsAvatarGrid"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
@@ -511,9 +511,9 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
       <summary>🤖 DeepSeek API 配置</summary>
       <p style="font-size:11px;color:var(--text-light);margin:8px 0;text-align:left;">设置后智能体将默认使用 DeepSeek 模型</p>
       <label>API Key</label>
-      <input type="text" id="settingsDsKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+      <input type="text" id="settingsDsKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="500" style="width:100%;border:2px dashed var(--border2);border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
       <label>Base URL</label>
-      <input type="text" id="settingsDsUrl" placeholder="https://api.deepseek.com" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+      <input type="text" id="settingsDsUrl" placeholder="https://api.deepseek.com" maxlength="500" style="width:100%;border:2px dashed var(--border2);border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
     </details>
   </div>
 
@@ -669,7 +669,7 @@ async function adminLoadStats(){
     if(d.error)return;
     var items=[['👥 用户',d.users],['💬 帖子',d.posts],['🗨️ 评论',d.comments],['📖 日记',d.diaries],['🤖 智能体',d.agents],['💞 好友关系',d.friends]];
     document.getElementById('adminStats').innerHTML=items.map(function(pair){
-      return '<div style="background:#fff;border:1px solid #f0e6ff;border-radius:10px;padding:10px 6px;text-align:center;"><div style="font-size:11px;color:#999;">'+pair[0]+'</div><div style="font-size:18px;font-weight:700;color:#7C4DFF;margin-top:2px;">'+pair[1]+'</div></div>';
+      return '<div style="background:#fff;border:1px dashed #E0D0F0;border-radius:10px;padding:10px 6px;text-align:center;"><div style="font-size:11px;color:#999;">'+pair[0]+'</div><div style="font-size:18px;font-weight:700;color:#7C4DFF;margin-top:2px;">'+pair[1]+'</div></div>';
     }).join('');
   }catch(e){}
 }
@@ -1773,12 +1773,12 @@ setToday();
 
 // 默认主题
 const DEFAULT_THEME = {
-  primary: '#7C4DFF',
-  secondary: '#E94560',
-  bg: '#f5f5f5',
+  primary: '#C9A8FF',
+  secondary: '#FFB5C2',
+  bg: '#FDF8F5',
   card_bg: '#ffffff',
-  text: '#333333',
-  text_light: '#999999'
+  text: '#4A4A4A',
+  text_light: '#B0A0A0'
 };
 
 // 应用主题到CSS变量

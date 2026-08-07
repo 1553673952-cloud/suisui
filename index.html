@@ -24,6 +24,8 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);max-width:600px;margin:0 auto;padding-bottom:80px;}
+body.has-bg-img{background:var(--bg-img, none) center/cover fixed no-repeat, var(--bg);}
+body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card{background:rgba(255,255,255,0.93);}
 .overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;justify-content:center;align-items:center;padding:20px;}
 .overlay.show{display:flex;}
 .setup-card{background:var(--card-bg);border-radius:20px;padding:30px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:slideUp 0.35s ease;}
@@ -511,6 +513,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
             <input type="color" id="themeCardBg" value="#ffffff" style="width:100%;height:40px;border:2px solid var(--border);border-radius:10px;padding:2px;cursor:pointer;background:none;">
           </div>
         </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);">
+            <label style="font-size:12px;">🖼️ 背景图片（可选）</label>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
+              <input type="file" id="themeBgUpload" accept="image/*" style="display:none">
+              <button type="button" id="themeBgUploadBtn" onclick="document.getElementById('themeBgUpload').click()" style="font-size:12px;padding:6px 14px;border:1px dashed #bbb;border-radius:14px;background:transparent;cursor:pointer;color:#999;">📷 选择图片</button>
+              <button type="button" id="themeBgClearBtn" style="font-size:12px;padding:6px 14px;border:1px dashed #bbb;border-radius:14px;background:transparent;cursor:pointer;color:#999;display:none;">✕ 移除背景图</button>
+              <span id="themeBgStatus" style="font-size:11px;color:#999;"></span>
+            </div>
+            <div id="themeBgPreviewWrap" style="display:none;margin-top:8px;border-radius:12px;overflow:hidden;border:2px solid var(--border);height:100px;background-size:cover;background-position:center;"></div>
+            <p style="font-size:11px;color:var(--text-light);margin-top:6px;">💡 图片会自动压缩后存进你的账号（换设备也在），选好后点「✨ 应用主题」生效</p>
+          </div>
+        </div>
         <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
           <button type="button" id="themeApplyBtn" style="flex:1;border:none;border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;">✨ 应用主题</button>
           <button type="button" id="themeResetBtn" style="flex:1;border:1px solid var(--border);border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card-bg);color:var(--text-light);">↺ 重置默认</button>
@@ -869,6 +883,54 @@ document.getElementById('settingsAvatarUpload').addEventListener('change', async
   btn.disabled = false;
 });
 
+// ====== 主题背景图上传（压缩后存 base64） ======
+window.pendingThemeBg = '';
+
+document.getElementById('themeBgUpload').addEventListener('change', function(e){
+  var file = e.target.files[0];
+  if(!file) return;
+  var status = document.getElementById('themeBgStatus');
+  var wrap = document.getElementById('themeBgPreviewWrap');
+  var clearBtn = document.getElementById('themeBgClearBtn');
+  status.textContent = '⏳ 压缩中...';
+  status.style.color = '#999';
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    var img = new Image();
+    img.onload = function(){
+      var MAX = 1600;
+      var w = img.width, h = img.height;
+      if(w > MAX){ h = Math.round(h * MAX / w); w = MAX; }
+      if(h > MAX){ w = Math.round(w * MAX / h); h = MAX; }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      window.pendingThemeBg = dataUrl;
+      wrap.style.backgroundImage = 'url(' + dataUrl + ')';
+      wrap.style.display = 'block';
+      clearBtn.style.display = '';
+      status.textContent = '✅ 已选好，点「✨ 应用主题」生效';
+      status.style.color = '#4CAF50';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('themeBgClearBtn').addEventListener('click', function(){
+  window.pendingThemeBg = '';
+  document.getElementById('themeBgUpload').value = '';
+  document.getElementById('themeBgPreviewWrap').style.display = 'none';
+  document.getElementById('themeBgClearBtn').style.display = 'none';
+  var st = document.getElementById('themeBgStatus');
+  st.textContent = '已移除，点「✨ 应用主题」生效';
+  st.style.color = '#999';
+});
+
 function initSettingsPage(){
   if(!user) return;
   // 重置上传状态
@@ -894,6 +956,24 @@ function initSettingsPage(){
   document.getElementById('settingsColorGrid').innerHTML=COLORS.map(c=>`<div class="color-opt${c===cur.color?' selected':''}" data-color="${c}" style="background:${c}" onclick="pickSettingsColor(this)"></div>`).join('');
   document.getElementById('settingsDsKey').value=cur.api_key||'';
   document.getElementById('settingsDsUrl').value=cur.api_base_url||'';
+  // 恢复已保存的背景图预览
+  var curTheme = window.currentTheme || {};
+  var savedBg = curTheme.bg_image || '';
+  window.pendingThemeBg = savedBg;
+  var bgWrap = document.getElementById('themeBgPreviewWrap');
+  var bgClear = document.getElementById('themeBgClearBtn');
+  var bgStatus = document.getElementById('themeBgStatus');
+  if(savedBg){
+    bgWrap.style.backgroundImage = 'url(' + savedBg + ')';
+    bgWrap.style.display = 'block';
+    bgClear.style.display = '';
+    bgStatus.textContent = '✅ 当前背景图';
+    bgStatus.style.color = '#4CAF50';
+  }else{
+    bgWrap.style.display = 'none';
+    bgClear.style.display = 'none';
+    bgStatus.textContent = '';
+  }
   initAdminUI();
 }
 
@@ -1841,6 +1921,16 @@ function applyTheme(theme){
   root.style.setProperty('--btn-gradient', 'linear-gradient(135deg, '+(theme.primary||DEFAULT_THEME.primary)+', '+lightenColor(theme.primary||DEFAULT_THEME.primary, 40)+')');
   // 更新shadow
   root.style.setProperty('--shadow', hexToRgba(theme.primary||DEFAULT_THEME.primary, 0.3));
+  // 背景图支持
+  window.currentTheme = theme;
+  var bgImg = theme.bg_image || '';
+  if(bgImg){
+    root.style.setProperty('--bg-img', 'url('+bgImg+')');
+    document.body.classList.add('has-bg-img');
+  }else{
+    root.style.setProperty('--bg-img', 'none');
+    document.body.classList.remove('has-bg-img');
+  }
   // 同步到设置页的颜色选择器
   if(document.getElementById('themePrimary')){
     document.getElementById('themePrimary').value = theme.primary || DEFAULT_THEME.primary;
@@ -1918,13 +2008,23 @@ document.addEventListener('click', function(e){
       primary: document.getElementById('themePrimary').value,
       secondary: document.getElementById('themeSecondary').value,
       bg: document.getElementById('themeBg').value,
-      card_bg: document.getElementById('themeCardBg').value
+      card_bg: document.getElementById('themeCardBg').value,
+      bg_image: window.pendingThemeBg || ''
     };
     applyTheme(theme);
     saveThemeToServer(theme);
     toast('🎨 主题已应用并保存！');
   }
   if(e.target.id === 'themeResetBtn'){
+    window.pendingThemeBg = '';
+    var bgWrap = document.getElementById('themeBgPreviewWrap');
+    var bgClear = document.getElementById('themeBgClearBtn');
+    var bgStatus = document.getElementById('themeBgStatus');
+    var bgInput = document.getElementById('themeBgUpload');
+    if(bgWrap){bgWrap.style.display='none';}
+    if(bgClear){bgClear.style.display='none';}
+    if(bgStatus){bgStatus.textContent='';}
+    if(bgInput){bgInput.value='';}
     applyTheme(DEFAULT_THEME);
     saveThemeToServer(DEFAULT_THEME);
     toast('↺ 已恢复默认主题');

@@ -996,8 +996,9 @@ async function loadPosts(){
         ${p.visible==='custom'?'<div style="font-size:12px;color:#999;margin:4px 0 0;"><span style="background:#f3edff;padding:2px 10px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;color:#6a3fd1;">🎯 '+(isMe?'仅指定的人可见':'指定可见')+'</span></div>':''}
         ${p.mood?`<div class="post-mood" style="background:${cl}22;color:${cl}">${p.mood}</div>`:''}
         <div class="post-actions">
+          <span onclick="toggleLike(${p.id}, this)">${p.liked?'💜':'🤍'} <span class="like-count">${p.likes||0}</span></span>
           <span onclick="toggleComment(${p.id})">💬 <span>${p.comments?.length||0}</span></span>
-          <span class="delete" onclick="deletePost(${p.id})">🗑</span>
+          ${isMe?`<span class="delete" onclick="deletePost(${p.id})">🗑</span>`:''}
         </div>
         ${p.comments?.length?'<div class="comments">'+p.comments.map(c=>{
           const ca=c.color||'#7C4DFF';const caa=c.avatar||(c.name==='沈郁'?'💜':'🌸');
@@ -1016,6 +1017,19 @@ function toggleComment(id){
   const f=document.getElementById('cf-'+id);
   f.style.display=f.style.display==='none'?'flex':'none';
   if(f.style.display==='flex') document.getElementById('ci-'+id).focus();
+}
+
+async function toggleLike(id, el){
+  if(!token){document.getElementById('authOverlay').classList.add('show');return toast('请先登录')}
+  const liked = el.textContent.trim().startsWith('💜');
+  const method = liked ? 'DELETE' : 'POST';
+  try{
+    const res = await fetch('/api/posts/'+id+'/like', {method, headers:authHeaders()});
+    const d = await res.json();
+    if(d.ok){
+      el.innerHTML = (liked?'🤍':'💜') + ' <span class="like-count">'+d.likes+'</span>';
+    }
+  }catch(e){}
 }
 
 async function addPost(){

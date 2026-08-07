@@ -505,6 +505,18 @@ body.has-bg-img .post,body.has-bg-img .post-form,body.has-bg-img .setup-card,bod
     </details>
   </div>
 
+  <!-- DeepSeek API 配置 -->
+  <div class="settings-card">
+    <details>
+      <summary>🤖 DeepSeek API 配置</summary>
+      <p style="font-size:11px;color:var(--text-light);margin:8px 0;text-align:left;">设置后智能体将默认使用 DeepSeek 模型</p>
+      <label>API Key</label>
+      <input type="text" id="settingsDsKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+      <label>Base URL</label>
+      <input type="text" id="settingsDsUrl" placeholder="https://api.deepseek.com" maxlength="500" style="width:100%;border:2px solid #eee;border-radius:14px;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;">
+    </details>
+  </div>
+
   <div style="padding:12px;">
     <button class="setup-btn" id="settingsSaveBtn">✨ 保存设置</button>
     <button style="width:100%;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;color:#e94560;cursor:pointer;margin-top:10px;background:#fff5f5;border:1px solid #ffd0d0;" onclick="doLogout()">退出登录</button>
